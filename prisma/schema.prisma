@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id       Int             @id @default(autoincrement())
+  name     String
+  email    String          @unique
+  role     String
+  status   String
+  password String
+  refreshTokenHash String?
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  ownedOrganization Organization? @relation("OrganizationOwner")
+  planning PlanningEntry[]
+  requests Request[]
+}
+
+model Organization {
+  id        Int       @id @default(autoincrement())
+  name      String
+  code      String    @unique
+  ownerId   Int?     @unique
+  owner     Employee? @relation("OrganizationOwner", fields: [ownerId], references: [id])
+  planningImageUrl String?
+  employees Employee[]
+  planning  PlanningEntry[]
+  requests  Request[]
+  createdAt DateTime  @default(now())
+}
+
+model PlanningEntry {
+  id         Int      @id @default(autoincrement())
+  date       DateTime
+  shift      String
+  note       String?
+  employeeId Int?
+  employee   Employee? @relation(fields: [employeeId], references: [id])
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+model Request {
+  id          Int      @id @default(autoincrement())
+  employeeId  Int
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  type        String
+  status      String
+  message     String?
+  adminMessage String?
+  documentUrl String?
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt   DateTime @default(now())
+}
