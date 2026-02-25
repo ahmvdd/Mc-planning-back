@@ -29,10 +29,11 @@ model Organization {
   ownerId   Int?     @unique
   owner     Employee? @relation("OrganizationOwner", fields: [ownerId], references: [id])
   planningImageUrl String?
-  employees Employee[]
-  planning  PlanningEntry[]
-  requests  Request[]
-  createdAt DateTime  @default(now())
+  employees    Employee[]
+  planning     PlanningEntry[]
+  requests     Request[]
+  invitations  Invitation[]
+  createdAt    DateTime  @default(now())
 }
 
 model PlanningEntry {
@@ -44,6 +45,17 @@ model PlanningEntry {
   employee   Employee? @relation(fields: [employeeId], references: [id])
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+model Invitation {
+  id             Int       @id @default(autoincrement())
+  email          String
+  token          String    @unique
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
 }
 
 model Request {
