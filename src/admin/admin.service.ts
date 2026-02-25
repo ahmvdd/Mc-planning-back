@@ -18,6 +18,14 @@ export class AdminService {
     );
   }
 
+  async getOrganization(orgId?: number) {
+    if (!orgId) throw new ForbiddenException('Organisation manquante');
+    return this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true, name: true, code: true },
+    });
+  }
+
   async setPlanningImage(imageData: string, orgId?: number) {
     if (!orgId) {
       throw new ForbiddenException('Organisation manquante');
