@@ -2,10 +2,11 @@ import { Module } from '@nestjs/common';
 import { InvitationController } from './invitation.controller';
 import { InvitationService } from './invitation.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PrismaModule],
-  controllers: [InvitationController],
-  providers: [InvitationService],
+    imports: [PrismaModule, AuthModule],
+    controllers: [InvitationController],
+    providers: [InvitationService],
 })
-export class InvitationModule {}
+  export class InvitationModule {}
