@@ -40,19 +40,19 @@ export class InvitationService {
 
     // Envoie l'email
     await this.resend.emails.send({
-      from: process.env.RESEND_FROM ?? 'MCPlanning <onboarding@resend.dev>',
+      from: process.env.RESEND_FROM ?? 'Shiftly <onboarding@resend.dev>',
       to: [email],
-      subject: `Invitation à rejoindre ${org?.name ?? 'MCPlanning'}`,
+      subject: `Invitation à rejoindre ${org?.name ?? 'Shiftly'}`,
       html: `
         <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
           <div style="background: linear-gradient(135deg, #4f46e5, #0ea5e9); border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 32px;">
-            <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 800;">MCPlanning</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 800;">Shiftly</h1>
             <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Gestion de planning d'équipe</p>
           </div>
 
           <h2 style="color: #0f172a; font-size: 22px;">Vous avez été invité(e) !</h2>
           <p style="color: #475569; line-height: 1.6;">
-            <strong>${org?.name ?? 'Votre responsable'}</strong> vous invite à rejoindre l'espace de gestion de planning MCPlanning.
+            <strong>${org?.name ?? 'Votre responsable'}</strong> vous invite à rejoindre l'espace de gestion de planning Shiftly.
           </p>
           <p style="color: #475569; line-height: 1.6;">
             Cliquez sur le bouton ci-dessous pour créer votre compte. Ce lien est valable <strong>48 heures</strong>.
