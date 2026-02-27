@@ -30,10 +30,22 @@ model Organization {
   owner     Employee? @relation("OrganizationOwner", fields: [ownerId], references: [id])
   planningImageUrl String?
   employees    Employee[]
+  plannings    Planning[]
   planning     PlanningEntry[]
   requests     Request[]
   invitations  Invitation[]
   createdAt    DateTime  @default(now())
+}
+
+model Planning {
+  id             Int             @id @default(autoincrement())
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  organizationId Int
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  entries        PlanningEntry[]
+  createdAt      DateTime        @default(now())
 }
 
 model PlanningEntry {
@@ -45,6 +57,8 @@ model PlanningEntry {
   employee   Employee? @relation(fields: [employeeId], references: [id])
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id])
+  planningId Int?
+  planning   Planning? @relation(fields: [planningId], references: [id], onDelete: Cascade)
 }
 
 model Invitation {

@@ -15,11 +15,42 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CreatePlanningDto } from './dto/create-planning.dto';
 import { UpdatePlanningDto } from './dto/update-planning.dto';
+import { CreatePlanningPeriodDto } from './dto/create-planning-period.dto';
 import { PlanningService } from './planning.service';
 
 @Controller('planning')
 export class PlanningController {
   constructor(private readonly planningService: PlanningService) {}
+
+  // ── Planning Periods ─────────────────────────────────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @Get('periods')
+  findAllPeriods(@Req() req: { user?: { orgId?: number } }) {
+    return this.planningService.findAllPeriods(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('periods')
+  createPeriod(
+    @Body() dto: CreatePlanningPeriodDto,
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    return this.planningService.createPeriod(dto, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Delete('periods/:id')
+  removePeriod(
+    @Param('id') id: string,
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    return this.planningService.removePeriod(Number(id), req.user);
+  }
+
+  // ── Planning Entries (shifts) ─────────────────────────────────────
 
   @UseGuards(JwtAuthGuard)
   @Get()

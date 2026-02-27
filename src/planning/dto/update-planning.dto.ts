@@ -3,4 +3,5 @@ export class UpdatePlanningDto {
   shift?: string;
   employeeId?: number;
   note?: string;
+  planningId?: number;
 }
