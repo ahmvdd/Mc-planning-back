@@ -1,11 +1,47 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePlanningDto } from './dto/create-planning.dto';
 import { UpdatePlanningDto } from './dto/update-planning.dto';
+import { CreatePlanningPeriodDto } from './dto/create-planning-period.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class PlanningService {
   constructor(private readonly prisma: PrismaService) {}
+
+  // ── Planning Periods ─────────────────────────────────────────────
+
+  async findAllPeriods(user?: { orgId?: number }) {
+    if (!user?.orgId) throw new ForbiddenException('Organisation manquante');
+    return this.prisma.planning.findMany({
+      where: { organizationId: user.orgId },
+      include: { entries: true },
+      orderBy: { startDate: 'desc' },
+    });
+  }
+
+  async createPeriod(dto: CreatePlanningPeriodDto, user?: { orgId?: number }) {
+    if (!user?.orgId) throw new ForbiddenException('Organisation manquante');
+    return this.prisma.planning.create({
+      data: {
+        name: dto.name,
+        startDate: new Date(dto.startDate),
+        endDate: new Date(dto.endDate),
+        organizationId: user.orgId,
+      },
+    });
+  }
+
+  async removePeriod(id: number, user?: { orgId?: number }) {
+    if (!user?.orgId) throw new ForbiddenException('Organisation manquante');
+    const period = await this.prisma.planning.findFirst({
+      where: { id, organizationId: user.orgId },
+    });
+    if (!period) throw new NotFoundException('Planning introuvable');
+    await this.prisma.planning.delete({ where: { id } });
+    return { status: 'deleted' };
+  }
+
+  // ── Planning Entries (shifts) ─────────────────────────────────────
 
   async findAll(
     date?: string,
@@ -44,6 +80,7 @@ export class PlanningService {
         employeeId: (dto.employeeId ?? null) as unknown as number | null,
         note: dto.note,
         organizationId: user.orgId,
+        planningId: dto.planningId ?? null,
       } as any,
     });
   }
@@ -66,6 +103,7 @@ export class PlanningService {
           shift: dto.shift,
           employeeId: (dto.employeeId ?? null) as unknown as number | null,
           note: dto.note,
+          planningId: dto.planningId !== undefined ? dto.planningId : undefined,
         } as any,
       });
     } catch {
