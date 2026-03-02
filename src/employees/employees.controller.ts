@@ -7,18 +7,26 @@ import {
   Patch,
   Post,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { EmployeesService } from './employees.service';
+import { EmployeesImportService } from './employees-import.service';
 
 @Controller('employees')
 export class EmployeesController {
-  constructor(private readonly employeesService: EmployeesService) {}
+  constructor(
+    private readonly employeesService: EmployeesService,
+    private readonly employeesImportService: EmployeesImportService,
+  ) {}
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -43,6 +51,22 @@ export class EmployeesController {
     @Req() req: { user?: { orgId?: number } },
   ) {
     return this.employeesService.create(dto, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('import')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async importCsv(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    if (!file) return { error: 'Aucun fichier reçu' };
+    return this.employeesImportService.importFromBuffer(
+      file.buffer,
+      file.mimetype,
+      req.user?.orgId ?? 0,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
