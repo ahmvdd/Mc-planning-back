@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(require('express').json({ limit: '10mb' }));
   app.enableCors({
         origin: ["http://localhost:3000", "http://localhost:3001", "https://mc-planning-front.vercel.app", "https://www.shiftly.site", "https://shiftly.site"],
     credentials: true,

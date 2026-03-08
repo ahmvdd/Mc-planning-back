@@ -6,7 +6,9 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class InvitationService {
-  private resend = new Resend(process.env.RESEND_API_KEY);
+  private get resend() {
+    return new Resend(process.env.RESEND_API_KEY ?? 'no-key');
+  }
 
   constructor(private readonly prisma: PrismaService) {}
 
