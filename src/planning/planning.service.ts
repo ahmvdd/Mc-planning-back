@@ -137,6 +137,10 @@ export class PlanningService {
       where: { id: user.orgId },
     });
 
-    return { planningImageUrl: (organization as { planningImageUrl?: string | null })?.planningImageUrl ?? null };
+    const org = organization as { planningImageUrl?: string | null; planningImageUrl2?: string | null };
+    return {
+      planningImageUrl: org?.planningImageUrl ?? null,
+      planningImageUrl2: org?.planningImageUrl2 ?? null,
+    };
   }
 }

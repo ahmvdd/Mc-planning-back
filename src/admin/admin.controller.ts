@@ -36,4 +36,14 @@ export class AdminController {
   ) {
     return this.adminService.setPlanningImage(dto.imageData, req.user?.orgId);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('planning-image2')
+  setPlanningImage2(
+    @Body() dto: SetPlanningImageDto,
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    return this.adminService.setPlanningImage2(dto.imageData, req.user?.orgId);
+  }
 }

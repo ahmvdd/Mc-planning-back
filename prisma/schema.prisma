@@ -28,7 +28,8 @@ model Organization {
   code      String    @unique
   ownerId   Int?     @unique
   owner     Employee? @relation("OrganizationOwner", fields: [ownerId], references: [id])
-  planningImageUrl String?
+  planningImageUrl  String?
+  planningImageUrl2 String?
   employees    Employee[]
   plannings    Planning[]
   planning     PlanningEntry[]
