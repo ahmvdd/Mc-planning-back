@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { AdminService } from './admin.service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { SetPlanningImageDto } from './dto/set-planning-image.dto';
+import { UpdateOrganizationDto } from './dto/update-organization.dto';
 
 @Controller('admin')
 export class AdminController {
@@ -15,6 +16,16 @@ export class AdminController {
   @Get('organization')
   getOrganization(@Req() req: { user?: { orgId?: number } }) {
     return this.adminService.getOrganization(req.user?.orgId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Patch('organization')
+  updateOrganization(
+    @Body() dto: UpdateOrganizationDto,
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    return this.adminService.updateOrganization(dto, req.user?.orgId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
