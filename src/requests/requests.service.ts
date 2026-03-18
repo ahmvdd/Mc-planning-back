@@ -22,20 +22,33 @@ export class RequestsService {
         ...(employeeId ? { employeeId } : {}),
       },
       include: {
+        employee: { select: { name: true } },
         organization: {
-          select: {
-            owner: {
-              select: { email: true },
-            },
-          },
+          select: { owner: { select: { email: true } } },
+        },
+        logs: {
+          orderBy: { createdAt: 'asc' },
+          include: { byEmployee: { select: { name: true } } },
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
 
     return requests.map((request) => {
       const managerEmail = request.organization?.owner?.email ?? null;
-      const { organization, ...rest } = request;
-      return { ...rest, managerEmail };
+      const { organization, employee, logs, ...rest } = request;
+      return {
+        ...rest,
+        employeeName: employee?.name ?? null,
+        managerEmail,
+        logs: logs.map((log) => ({
+          id: log.id,
+          action: log.action,
+          note: log.note,
+          createdAt: log.createdAt,
+          byEmployeeName: log.byEmployee?.name ?? null,
+        })),
+      };
     });
   }
 
@@ -53,19 +66,36 @@ export class RequestsService {
     if (!employeeId) {
       throw new ForbiddenException('Employé manquant');
     }
-    return this.prisma.request.create({
-      data: {
-        employeeId,
-        type: dto.type,
-        status: 'pending',
-        message: dto.message,
-        documentUrl: dto.documentUrl,
-        organizationId: user.orgId,
-      },
+
+    return this.prisma.$transaction(async (tx) => {
+      const request = await tx.request.create({
+        data: {
+          employeeId,
+          type: dto.type,
+          status: 'pending',
+          message: dto.message,
+          documentUrl: dto.documentUrl,
+          organizationId: user.orgId!,
+        },
+      });
+
+      await tx.requestLog.create({
+        data: {
+          requestId: request.id,
+          action: 'created',
+          byEmployeeId: user.sub ?? null,
+        },
+      });
+
+      return request;
     });
   }
 
-  async update(id: number, dto: UpdateRequestDto, user?: { orgId?: number }) {
+  async update(
+    id: number,
+    dto: UpdateRequestDto,
+    user?: { orgId?: number; sub?: number },
+  ) {
     if (!user?.orgId) {
       throw new ForbiddenException('Organisation manquante');
     }
@@ -76,14 +106,30 @@ export class RequestsService {
       if (!request) {
         throw new NotFoundException('Demande introuvable');
       }
-      return await this.prisma.request.update({
-        where: { id: request.id },
-        data: {
-          status: dto.status,
-          message: dto.message,
-          documentUrl: dto.documentUrl,
-          adminMessage: dto.adminMessage,
-        } as any,
+
+      return await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.request.update({
+          where: { id: request.id },
+          data: {
+            status: dto.status,
+            message: dto.message,
+            documentUrl: dto.documentUrl,
+            adminMessage: dto.adminMessage,
+          } as any,
+        });
+
+        if (dto.status && dto.status !== request.status) {
+          await tx.requestLog.create({
+            data: {
+              requestId: id,
+              action: dto.status,
+              byEmployeeId: user.sub ?? null,
+              note: dto.adminMessage ?? null,
+            },
+          });
+        }
+
+        return updated;
       });
     } catch {
       throw new NotFoundException('Demande introuvable');
