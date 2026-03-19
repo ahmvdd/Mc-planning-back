@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -56,5 +56,19 @@ export class AdminController {
     @Req() req: { user?: { orgId?: number } },
   ) {
     return this.adminService.setPlanningImage2(dto.imageData, req.user?.orgId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Delete('planning-image')
+  clearPlanningImage(@Req() req: { user?: { orgId?: number } }) {
+    return this.adminService.clearPlanningImage(1, req.user?.orgId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Delete('planning-image2')
+  clearPlanningImage2(@Req() req: { user?: { orgId?: number } }) {
+    return this.adminService.clearPlanningImage(2, req.user?.orgId);
   }
 }

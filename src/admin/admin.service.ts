@@ -59,4 +59,16 @@ export class AdminService {
       select: { id: true, planningImageUrl2: true } as any,
     });
   }
+
+  async clearPlanningImage(slot: 1 | 2, orgId?: number) {
+    if (!orgId) throw new ForbiddenException('Organisation manquante');
+    const data = slot === 1
+      ? { planningImageUrl: null }
+      : ({ planningImageUrl2: null } as any);
+    return this.prisma.organization.update({
+      where: { id: orgId },
+      data,
+      select: { id: true },
+    });
+  }
 }
