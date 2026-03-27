@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -29,5 +29,24 @@ export class InvitationController {
   @Post('accept')
   accept(@Body() body: { token: string; name: string; password: string }) {
     return this.invitationService.acceptInvitation(body.token, body.name, body.password);
+  }
+
+  // Admin liste les invitations en attente
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Get()
+  listPending(@Req() req: { user?: { orgId?: number } }) {
+    return this.invitationService.listPending(req.user!.orgId!);
+  }
+
+  // Admin annule une invitation
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Delete(':id')
+  cancel(
+    @Param('id') id: string,
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    return this.invitationService.cancelInvitation(Number(id), req.user!.orgId!);
   }
 }

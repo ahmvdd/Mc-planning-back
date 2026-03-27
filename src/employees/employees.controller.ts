@@ -69,6 +69,15 @@ export class EmployeesController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Patch('me')
+  updateMe(
+    @Body() body: { name?: string; password?: string },
+    @Req() req: { user?: { orgId?: number; sub?: number } },
+  ) {
+    return this.employeesService.updateMe(body, req.user);
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Patch(':id')
