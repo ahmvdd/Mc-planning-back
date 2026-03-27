@@ -12,6 +12,22 @@ export class InvitationService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  async listPending(orgId: number) {
+    const now = new Date();
+    return this.prisma.invitation.findMany({
+      where: { organizationId: orgId, usedAt: null, expiresAt: { gt: now } },
+      select: { id: true, email: true, createdAt: true, expiresAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async cancelInvitation(id: number, orgId: number) {
+    const inv = await this.prisma.invitation.findFirst({ where: { id, organizationId: orgId } });
+    if (!inv) return { success: false };
+    await this.prisma.invitation.delete({ where: { id } });
+    return { success: true };
+  }
+
   async sendInvitation(email: string, orgId: number) {
     // Vérifie si un compte existe déjà
     const existing = await this.prisma.employee.findUnique({ where: { email } });

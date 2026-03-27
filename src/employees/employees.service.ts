@@ -64,6 +64,23 @@ export class EmployeesService {
     });
   }
 
+  async updateMe(
+    data: { name?: string; password?: string },
+    user?: { orgId?: number; sub?: number },
+  ) {
+    if (!user?.orgId || !user?.sub) {
+      throw new ForbiddenException('Non authentifié');
+    }
+    const updateData: Record<string, unknown> = {};
+    if (data.name) updateData.name = data.name;
+    if (data.password) updateData.password = await bcrypt.hash(data.password, 10);
+    return this.prisma.employee.update({
+      where: { id: user.sub },
+      data: updateData,
+      select: { id: true, name: true, email: true, role: true, status: true },
+    });
+  }
+
   async update(id: number, dto: UpdateEmployeeDto, user?: { orgId?: number }) {
     if (!user?.orgId) {
       throw new ForbiddenException('Organisation manquante');
