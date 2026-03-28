@@ -72,8 +72,14 @@ export class EmployeesService {
       throw new ForbiddenException('Non authentifié');
     }
     const updateData: Record<string, unknown> = {};
-    if (data.name) updateData.name = data.name;
+    if (data.name?.trim()) updateData.name = data.name.trim();
     if (data.password) updateData.password = await bcrypt.hash(data.password, 10);
+    if (Object.keys(updateData).length === 0) {
+      return this.prisma.employee.findUnique({
+        where: { id: user.sub },
+        select: { id: true, name: true, email: true, role: true, status: true },
+      });
+    }
     return this.prisma.employee.update({
       where: { id: user.sub },
       data: updateData,
