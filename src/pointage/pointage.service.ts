@@ -6,6 +6,7 @@ import * as QRCode from 'qrcode';
 const QR_SECRET = process.env.JWT_SECRET + '_qr';
 const QR_VALIDITY_HOURS = 8;
 const LATE_THRESHOLD_MINUTES = 15;
+const WORKPLACE_QR_SECRET = process.env.JWT_SECRET + '_workplace';
 
 @Injectable()
 export class PointageService {
@@ -66,6 +67,78 @@ export class PointageService {
     if (diffMinutes < -LATE_THRESHOLD_MINUTES) {
       status = 'present'; // En avance ou à l'heure
     } else if (diffMinutes <= LATE_THRESHOLD_MINUTES) {
+      status = 'present';
+    } else if (diffMinutes <= 60) {
+      status = 'late';
+    } else {
+      status = 'absent';
+    }
+
+    return this.prisma.pointage.create({
+      data: {
+        employeeId,
+        planningEntryId: entry.id,
+        organizationId: orgId,
+        scannedAt: now,
+        status,
+      },
+      include: { employee: { select: { name: true } } },
+    });
+  }
+
+  // ── Admin : génère le QR code de l'entrée (workplace) ──
+  async generateWorkplaceQR(orgId: number): Promise<string> {
+    const token = this.jwtService.sign(
+      { orgId, type: 'workplace_checkin' },
+      { secret: WORKPLACE_QR_SECRET }, // pas d'expiration → QR permanent
+    );
+    const url = `${process.env.FRONTEND_URL}/scan?workplace=${token}`;
+    return QRCode.toDataURL(url);
+  }
+
+  // ── Employé : scanne le QR d'entrée → détecte son shift auto ──
+  async checkin(employeeId: number, orgId: number, workplaceToken: string) {
+    try {
+      const payload = this.jwtService.verify<{ orgId: number; type: string }>(
+        workplaceToken,
+        { secret: WORKPLACE_QR_SECRET },
+      );
+      if (payload.type !== 'workplace_checkin') throw new Error();
+      if (payload.orgId !== orgId) throw new BadRequestException('Organisation incorrecte');
+    } catch {
+      throw new BadRequestException('QR code invalide');
+    }
+
+    // Trouver le shift de l'employé aujourd'hui
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const entry = await this.prisma.planningEntry.findFirst({
+      where: {
+        organizationId: orgId,
+        employeeId,
+        date: { gte: today, lt: tomorrow },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    if (!entry) throw new NotFoundException('Aucun créneau prévu pour vous aujourd\'hui');
+
+    // Vérifier si déjà pointé
+    const existing = await this.prisma.pointage.findFirst({
+      where: { employeeId, planningEntryId: entry.id },
+    });
+    if (existing) throw new BadRequestException('Vous avez déjà pointé pour ce créneau');
+
+    // Calcul du statut
+    const now = new Date();
+    const shiftDate = new Date(entry.date);
+    const diffMinutes = (now.getTime() - shiftDate.getTime()) / 60000;
+
+    let status: string;
+    if (diffMinutes <= LATE_THRESHOLD_MINUTES) {
       status = 'present';
     } else if (diffMinutes <= 60) {
       status = 'late';

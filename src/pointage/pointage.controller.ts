@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, UseGuards, Request, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards, Request, ParseIntPipe, UnauthorizedException } from '@nestjs/common';
 import { PointageService } from './pointage.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -11,15 +11,30 @@ export class PointageController {
 
   // Employé : scanner un QR code
   @Post('scan')
-  scan(@Body() body: { token: string }, @Request() req: any) {
+  scan(@Body() body: { token: string }, @Request() req: { user: { sub: number; organizationId: number } }) {
     return this.pointageService.scan(body.token, req.user.sub, req.user.organizationId);
   }
 
-  // Admin : générer QR pour un créneau
+  // Employé : scanner le QR d'entrée (workplace)
+  @Post('checkin')
+  checkin(@Body() body: { workplaceToken: string }, @Request() req: { user: { sub: number; organizationId: number } }) {
+    if (!body.workplaceToken) throw new UnauthorizedException('Token manquant');
+    return this.pointageService.checkin(req.user.sub, req.user.organizationId, body.workplaceToken);
+  }
+
+  // Admin : générer le QR code d'entrée (workplace, permanent)
+  @Get('workplace-qr')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  getWorkplaceQR(@Request() req: { user: { organizationId: number } }) {
+    return this.pointageService.generateWorkplaceQR(req.user.organizationId);
+  }
+
+  // Admin : générer QR pour un créneau spécifique
   @Post('qr/:planningEntryId')
   @UseGuards(RolesGuard)
   @Roles('admin')
-  generateQR(@Param('planningEntryId', ParseIntPipe) id: number, @Request() req: any) {
+  generateQR(@Param('planningEntryId', ParseIntPipe) id: number, @Request() req: { user: { organizationId: number } }) {
     return this.pointageService.generateQR(id, req.user.organizationId);
   }
 
@@ -27,7 +42,7 @@ export class PointageController {
   @Get('today')
   @UseGuards(RolesGuard)
   @Roles('admin')
-  getToday(@Request() req: any) {
+  getToday(@Request() req: { user: { organizationId: number } }) {
     return this.pointageService.getToday(req.user.organizationId);
   }
 
@@ -37,7 +52,7 @@ export class PointageController {
   @Roles('admin')
   manual(
     @Body() body: { planningEntryId: number; employeeId: number; status: string; note?: string },
-    @Request() req: any,
+    @Request() req: { user: { organizationId: number } },
   ) {
     return this.pointageService.manualPointage(
       body.planningEntryId,
