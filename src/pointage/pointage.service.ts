@@ -28,7 +28,8 @@ export class PointageService {
     );
 
     const url = `${process.env.FRONTEND_URL}/scan?token=${token}`;
-    return QRCode.toDataURL(url);
+    const img = await QRCode.toDataURL(url);
+    return { img };
   }
 
   // ── L'employé scanne → enregistre le pointage ──
@@ -93,7 +94,8 @@ export class PointageService {
       { secret: WORKPLACE_QR_SECRET }, // pas d'expiration → QR permanent
     );
     const url = `${process.env.FRONTEND_URL}/scan?workplace=${token}`;
-    return QRCode.toDataURL(url);
+    const img = await QRCode.toDataURL(url);
+    return { img };
   }
 
   // ── Employé : scanne le QR d'entrée → détecte son shift auto ──
