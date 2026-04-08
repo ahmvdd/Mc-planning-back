@@ -16,7 +16,7 @@ export class PointageService {
   ) {}
 
   // ── Génère un QR code pour un créneau planning ──
-  async generateQR(planningEntryId: number, orgId: number): Promise<string> {
+  async generateQR(planningEntryId: number, orgId: number): Promise<{ img: string }> {
     const entry = await this.prisma.planningEntry.findFirst({
       where: { id: planningEntryId, organizationId: orgId },
     });
@@ -88,7 +88,7 @@ export class PointageService {
   }
 
   // ── Admin : génère le QR code de l'entrée (workplace) ──
-  async generateWorkplaceQR(orgId: number): Promise<string> {
+  async generateWorkplaceQR(orgId: number): Promise<{ img: string }> {
     const token = this.jwtService.sign(
       { orgId, type: 'workplace_checkin' },
       { secret: WORKPLACE_QR_SECRET }, // pas d'expiration → QR permanent
