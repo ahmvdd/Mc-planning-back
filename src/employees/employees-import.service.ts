@@ -1,17 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { parse } from 'csv-parse/sync';
 import * as XLSX from 'xlsx';
+import * as bcrypt from 'bcryptjs';
+import { PrismaService } from '../prisma/prisma.service';
 import { InvitationService } from '../invitation/invitation.service';
 
 export type ImportResult = {
   total: number;
+  created: number;
   invited: number;
   errors: { email: string; reason: string }[];
 };
 
 @Injectable()
 export class EmployeesImportService {
-  constructor(private readonly invitationService: InvitationService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly invitationService: InvitationService,
+  ) {}
 
   async importFromBuffer(
     buffer: Buffer,
@@ -19,7 +25,7 @@ export class EmployeesImportService {
     orgId: number,
   ): Promise<ImportResult> {
     const rows = this.parseFile(buffer, mimetype);
-    const result: ImportResult = { total: rows.length, invited: 0, errors: [] };
+    const result: ImportResult = { total: rows.length, created: 0, invited: 0, errors: [] };
 
     for (const row of rows) {
       const email = row.email?.trim().toLowerCase();
@@ -27,9 +33,39 @@ export class EmployeesImportService {
         result.errors.push({ email: email ?? '(vide)', reason: 'Email invalide' });
         continue;
       }
+
+      // Vérifie si l'employé existe déjà
+      const existing = await this.prisma.employee.findUnique({ where: { email } });
+      if (existing) {
+        result.errors.push({ email, reason: 'Compte déjà existant' });
+        continue;
+      }
+
       try {
-        await this.invitationService.sendInvitation(email, orgId);
-        result.invited++;
+        // Crée le compte directement en base avec mot de passe temporaire
+        const tempPassword = Math.random().toString(36).slice(-8);
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        const name = row.name?.trim() || email.split('@')[0];
+
+        await this.prisma.employee.create({
+          data: {
+            email,
+            name,
+            password: hashedPassword,
+            role: 'employee',
+            status: 'active',
+            organizationId: orgId,
+          },
+        });
+        result.created++;
+
+        // Envoie aussi une invitation pour qu'il puisse définir son mot de passe
+        try {
+          await this.invitationService.sendInvitation(email, orgId);
+          result.invited++;
+        } catch {
+          // L'invitation est optionnelle — le compte est déjà créé
+        }
       } catch (err: unknown) {
         result.errors.push({ email, reason: (err instanceof Error ? err.message : null) ?? 'Erreur inconnue' });
       }
@@ -39,10 +75,8 @@ export class EmployeesImportService {
   }
 
   private buildName(r: Record<string, string>): string {
-    // Colonne "name" ou "Name"
     if (r.name?.trim()) return r.name.trim();
     if (r.Name?.trim()) return r.Name.trim();
-    // Colonnes séparées Prénom / Nom (format RH français)
     const prenom = (r['Prénom'] ?? r['prenom'] ?? r['firstname'] ?? r['Firstname'] ?? '').trim();
     const nom = (r['Nom'] ?? r['nom'] ?? r['lastname'] ?? r['Lastname'] ?? '').trim();
     if (prenom || nom) return `${prenom} ${nom}`.trim();
@@ -50,7 +84,6 @@ export class EmployeesImportService {
   }
 
   private parseFile(buffer: Buffer, mimetype: string): { email: string; name?: string }[] {
-    // CSV
     if (mimetype === 'text/csv' || mimetype === 'application/csv') {
       const records = parse(buffer, {
         columns: true,
@@ -63,7 +96,6 @@ export class EmployeesImportService {
       }));
     }
 
-    // Excel (.xlsx / .xls)
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet);
