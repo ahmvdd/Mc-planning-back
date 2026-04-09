@@ -9,7 +9,10 @@ import {
   Query,
   Req,
   UseGuards,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -59,6 +62,18 @@ export class PlanningController {
     @Req() req: { user?: { orgId?: number; role?: string; sub?: number } },
   ) {
     return this.planningService.findAll(date, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('import')
+  @UseInterceptors(FileInterceptor('file'))
+  importFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    if (!file) return { created: 0, errors: ['Aucun fichier reçu'] };
+    return this.planningService.importFile(file.buffer, file.mimetype, req.user?.orgId ?? 0);
   }
 
   @UseGuards(JwtAuthGuard)
