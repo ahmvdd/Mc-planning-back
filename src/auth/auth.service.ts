@@ -22,6 +22,10 @@ export class AuthService {
       throw new UnauthorizedException('Identifiants invalides');
     }
 
+    if (user.status === 'invited') {
+      throw new UnauthorizedException('Veuillez accepter votre invitation par email avant de vous connecter');
+    }
+
     const tokens = await this.issueTokens(user.id, user.email, user.role, user.organizationId);
     await this.storeRefreshTokenHash(user.id, tokens.refreshToken);
 

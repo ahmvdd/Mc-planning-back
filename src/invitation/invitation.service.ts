@@ -121,16 +121,27 @@ export class InvitationService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const employee = await this.prisma.employee.create({
-      data: {
-        name,
-        email: invitation.email,
-        password: hashedPassword,
-        role: 'employee',
-        status: 'active',
-        organizationId: invitation.organizationId,
-      },
-    });
+    // L'employé peut déjà exister (créé à l'import CSV avec status 'invited')
+    const existingEmployee = await this.prisma.employee.findUnique({ where: { email: invitation.email } });
+
+    let employee: { id: number };
+    if (existingEmployee) {
+      employee = await this.prisma.employee.update({
+        where: { email: invitation.email },
+        data: { name, password: hashedPassword, status: 'active' },
+      });
+    } else {
+      employee = await this.prisma.employee.create({
+        data: {
+          name,
+          email: invitation.email,
+          password: hashedPassword,
+          role: 'employee',
+          status: 'active',
+          organizationId: invitation.organizationId,
+        },
+      });
+    }
 
     // Marque l'invitation comme utilisée
     await this.prisma.invitation.update({

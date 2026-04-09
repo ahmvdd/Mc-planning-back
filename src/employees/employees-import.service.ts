@@ -53,7 +53,7 @@ export class EmployeesImportService {
             name,
             password: hashedPassword,
             role: 'employee',
-            status: 'active',
+            status: 'invited', // bloqué en login jusqu'à acceptation invitation
             organizationId: orgId,
           },
         });
