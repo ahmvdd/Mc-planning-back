@@ -30,12 +30,23 @@ export class EmployeesImportService {
       try {
         await this.invitationService.sendInvitation(email, orgId);
         result.invited++;
-      } catch (err: any) {
-        result.errors.push({ email, reason: err?.message ?? 'Erreur inconnue' });
+      } catch (err: unknown) {
+        result.errors.push({ email, reason: (err instanceof Error ? err.message : null) ?? 'Erreur inconnue' });
       }
     }
 
     return result;
+  }
+
+  private buildName(r: Record<string, string>): string {
+    // Colonne "name" ou "Name"
+    if (r.name?.trim()) return r.name.trim();
+    if (r.Name?.trim()) return r.Name.trim();
+    // Colonnes séparées Prénom / Nom (format RH français)
+    const prenom = (r['Prénom'] ?? r['prenom'] ?? r['firstname'] ?? r['Firstname'] ?? '').trim();
+    const nom = (r['Nom'] ?? r['nom'] ?? r['lastname'] ?? r['Lastname'] ?? '').trim();
+    if (prenom || nom) return `${prenom} ${nom}`.trim();
+    return '';
   }
 
   private parseFile(buffer: Buffer, mimetype: string): { email: string; name?: string }[] {
@@ -46,7 +57,10 @@ export class EmployeesImportService {
         skip_empty_lines: true,
         trim: true,
       }) as Record<string, string>[];
-      return records.map(r => ({ email: r.email ?? r.Email ?? r.EMAIL, name: r.name ?? r.Name }));
+      return records.map(r => ({
+        email: r.email ?? r.Email ?? r.EMAIL,
+        name: this.buildName(r),
+      }));
     }
 
     // Excel (.xlsx / .xls)
@@ -55,7 +69,7 @@ export class EmployeesImportService {
     const rows = XLSX.utils.sheet_to_json<Record<string, string>>(sheet);
     return rows.map(r => ({
       email: String(r.email ?? r.Email ?? r.EMAIL ?? ''),
-      name: String(r.name ?? r.Name ?? ''),
+      name: this.buildName(r),
     }));
   }
 }
