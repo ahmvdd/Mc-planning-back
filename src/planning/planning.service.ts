@@ -134,7 +134,7 @@ export class PlanningService {
     buffer: Buffer,
     _mimetype: string,
     orgId: number,
-  ): Promise<{ created: number; errors: string[] }> {
+  ): Promise<{ created: number; errors: string[]; ids: number[] }> {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const allRows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false }) as string[][];
