@@ -134,7 +134,7 @@ export class PlanningService {
     buffer: Buffer,
     _mimetype: string,
     orgId: number,
-  ): Promise<{ created: number; errors: string[] }> {
+  ): Promise<{ created: number; errors: string[]; ids: number[] }> {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const allRows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, raw: false }) as string[][];
@@ -213,11 +213,30 @@ export class PlanningService {
     }
 
     // Insert en masse via transaction
-    await this.prisma.$transaction(
+    const insertedEntries = await this.prisma.$transaction(
       toInsert.map(entry => this.prisma.planningEntry.create({ data: entry }))
     );
 
-    return { created: toInsert.length, errors };
+    return {
+      created: insertedEntries.length,
+      errors,
+      ids: insertedEntries.map(entry => entry.id),
+    };
+  }
+
+  async deleteImportedEntries(ids: number[], user?: { orgId?: number }) {
+    if (!user?.orgId) {
+      throw new ForbiddenException('Organisation manquante');
+    }
+
+    const deleted = await this.prisma.planningEntry.deleteMany({
+      where: {
+        id: { in: ids },
+        organizationId: user.orgId,
+      },
+    });
+
+    return { deleted };
   }
 
   async getPlanningImage(user?: { orgId?: number }) {

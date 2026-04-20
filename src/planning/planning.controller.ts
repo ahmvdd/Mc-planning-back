@@ -76,6 +76,16 @@ export class PlanningController {
     return this.planningService.importFile(file.buffer, file.mimetype, req.user?.orgId ?? 0);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Delete('import')
+  deleteImportedEntries(
+    @Body() body: { ids: number[] },
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    return this.planningService.deleteImportedEntries(body.ids, req.user);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('image')
   getPlanningImage(@Req() req: { user?: { orgId?: number } }) {
