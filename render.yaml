@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: mcplanning-backend
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/src/main
+    preDeployCommand: npx prisma migrate deploy
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromSecret: database_url
+      - key: JWT_SECRET
+        fromSecret: jwt_secret
+      - key: FRONTEND_URL
+        fromSecret: frontend_url
+      - key: RESEND_API_KEY
+        fromSecret: resend_api_key
+      - key: RESEND_FROM
+        fromSecret: resend_from
