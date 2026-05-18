@@ -8,6 +8,19 @@ const QR_VALIDITY_HOURS = 8;
 const LATE_THRESHOLD_MINUTES = 15;
 const WORKPLACE_QR_SECRET = process.env.JWT_SECRET + '_workplace';
 
+// Extrait l'heure de début depuis le champ shift et la combine avec la date du créneau
+// Gère : "08h-16h", "08h00-16h00", "08:00 - 16:00", "Matin 8h-16h", "8h30 – 16h", etc.
+function parseShiftStart(shift: string, entryDate: Date): Date {
+  const m = shift.match(/(\d{1,2})[h:](\d{0,2})/i);
+  const base = new Date(entryDate);
+  if (m) {
+    const hours = parseInt(m[1], 10);
+    const minutes = parseInt(m[2] || '0', 10);
+    base.setUTCHours(hours, minutes, 0, 0);
+  }
+  return base;
+}
+
 @Injectable()
 export class PointageService {
   constructor(
@@ -59,9 +72,9 @@ export class PointageService {
     });
     if (existing) throw new BadRequestException('Vous avez déjà pointé pour ce créneau');
 
-    // Calcul du statut
+    // Calcul du statut basé sur l'heure réelle du shift
     const now = new Date();
-    const shiftDate = new Date(entry.date);
+    const shiftDate = parseShiftStart(entry.shift, entry.date);
     const diffMinutes = (now.getTime() - shiftDate.getTime()) / 60000;
 
     let status: string;
@@ -134,9 +147,9 @@ export class PointageService {
     });
     if (existing) throw new BadRequestException('Vous avez déjà pointé pour ce créneau');
 
-    // Calcul du statut
+    // Calcul du statut basé sur l'heure réelle du shift
     const now = new Date();
-    const shiftDate = new Date(entry.date);
+    const shiftDate = parseShiftStart(entry.shift, entry.date);
     const diffMinutes = (now.getTime() - shiftDate.getTime()) / 60000;
 
     let status: string;
