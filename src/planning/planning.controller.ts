@@ -116,8 +116,8 @@ export class PlanningController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Delete(':id')
-  remove(@Param('id') id: string, @Req() req: { user?: { orgId?: number } }) {
-    this.planningService.remove(Number(id), req.user);
+  async remove(@Param('id') id: string, @Req() req: { user?: { orgId?: number } }) {
+    await this.planningService.remove(Number(id), req.user);
     return { status: 'deleted' };
   }
 }
