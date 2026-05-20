@@ -44,6 +44,9 @@ export class AuthService {
   }
 
   async signup(dto: SignupDto) {
+    const existing = await this.prisma.employee.findUnique({ where: { email: dto.email } });
+    if (existing) throw new BadRequestException('Un compte avec cet email existe déjà');
+
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
     if (dto.role === 'admin') {
