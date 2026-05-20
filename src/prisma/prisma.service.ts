@@ -16,7 +16,11 @@ export class PrismaService
   }
 
   async onModuleInit() {
-    await this.$connect();
+    try {
+      await this.$connect();
+    } catch (e) {
+      console.error('[Prisma] DB unreachable at startup — will retry on first query', e);
+    }
   }
 
   async onModuleDestroy() {
