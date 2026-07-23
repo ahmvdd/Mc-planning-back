@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -40,7 +41,9 @@ export class EmployeesController {
     @Param('id') id: string,
     @Req() req: { user?: { orgId?: number; role?: string; sub?: number } },
   ) {
-    return this.employeesService.findOne(Number(id), req.user);
+    const numId = Number(id);
+    if (!Number.isInteger(numId)) throw new BadRequestException('id invalide');
+    return this.employeesService.findOne(numId, req.user);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -86,14 +89,18 @@ export class EmployeesController {
     @Body() dto: UpdateEmployeeDto,
     @Req() req: { user?: { orgId?: number } },
   ) {
-    return this.employeesService.update(Number(id), dto, req.user);
+    const numId = Number(id);
+    if (!Number.isInteger(numId)) throw new BadRequestException('id invalide');
+    return this.employeesService.update(numId, dto, req.user);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Delete(':id')
   remove(@Param('id') id: string, @Req() req: { user?: { orgId?: number } }) {
-    this.employeesService.remove(Number(id), req.user);
+    const numId = Number(id);
+    if (!Number.isInteger(numId)) throw new BadRequestException('id invalide');
+    this.employeesService.remove(numId, req.user);
     return { status: 'deleted' };
   }
 }
