@@ -104,7 +104,7 @@ export class PointageService {
   async generateWorkplaceQR(orgId: number): Promise<{ img: string }> {
     const token = this.jwtService.sign(
       { orgId, type: 'workplace_checkin' },
-      { secret: WORKPLACE_QR_SECRET }, // pas d'expiration → QR permanent
+      { secret: WORKPLACE_QR_SECRET, expiresIn: '3650d' }, // QR permanent — le module JWT a un défaut de 2h qu'il faut écraser explicitement
     );
     const url = `${process.env.FRONTEND_URL}/scan?workplace=${token}`;
     const img = await QRCode.toDataURL(url);
