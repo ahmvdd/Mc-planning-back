@@ -23,6 +23,19 @@ model Employee {
   requests Request[]
   requestLogs RequestLog[] @relation("RequestLogAuthor")
   pointages Pointage[]
+  availabilities Availability[]
+}
+
+model Availability {
+  id             Int          @id @default(autoincrement())
+  employeeId     Int
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  dayOfWeek      Int          // 0 = lundi ... 6 = dimanche
+  startTime      String       // "09:00"
+  endTime        String       // "17:00"
+  createdAt      DateTime     @default(now())
 }
 
 model Organization {
@@ -39,6 +52,7 @@ model Organization {
   requests     Request[]
   invitations  Invitation[]
   pointages    Pointage[]
+  availabilities Availability[]
   createdAt    DateTime  @default(now())
 
   plan                 String    @default("free")

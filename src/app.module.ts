@@ -11,6 +11,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { KeepAliveModule } from './keep-alive/keep-alive.module';
 import { PointageModule } from './pointage/pointage.module';
 import { BillingModule } from './billing/billing.module';
+import { AvailabilityModule } from './availability/availability.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { BillingModule } from './billing/billing.module';
     KeepAliveModule,
     PointageModule,
     BillingModule,
+    AvailabilityModule,
   ],
   controllers: [AppController],
   providers: [],
