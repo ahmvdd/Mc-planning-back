@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { Resend } from 'resend';
 import { PrismaService } from '../prisma/prisma.service';
+import { FREE_PLAN_EMPLOYEE_LIMIT } from '../billing/billing.service';
 
 @Injectable()
 export class InvitationService {
@@ -131,6 +132,19 @@ export class InvitationService {
         data: { name, password: hashedPassword, status: 'active' },
       });
     } else {
+      const org = await this.prisma.organization.findUnique({
+        where: { id: invitation.organizationId },
+        select: { plan: true },
+      });
+      if (org?.plan !== 'pro') {
+        const count = await this.prisma.employee.count({ where: { organizationId: invitation.organizationId } });
+        if (count >= FREE_PLAN_EMPLOYEE_LIMIT) {
+          throw new BadRequestException(
+            `Limite du plan gratuit atteinte (${FREE_PLAN_EMPLOYEE_LIMIT} employés). Contactez votre administrateur.`,
+          );
+        }
+      }
+
       employee = await this.prisma.employee.create({
         data: {
           name,

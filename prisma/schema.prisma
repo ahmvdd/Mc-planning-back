@@ -40,6 +40,12 @@ model Organization {
   invitations  Invitation[]
   pointages    Pointage[]
   createdAt    DateTime  @default(now())
+
+  plan                 String    @default("free")
+  subscriptionStatus    String?
+  stripeCustomerId      String?   @unique
+  stripeSubscriptionId  String?   @unique
+  currentPeriodEnd      DateTime?
 }
 
 model Planning {

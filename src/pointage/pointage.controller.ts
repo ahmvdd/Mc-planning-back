@@ -3,6 +3,7 @@ import { PointageService } from './pointage.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ProPlanGuard } from '../billing/pro-plan.guard';
 
 @Controller('pointage')
 @UseGuards(JwtAuthGuard)
@@ -22,33 +23,33 @@ export class PointageController {
     return this.pointageService.checkin(req.user.sub, req.user.orgId, body.workplaceToken);
   }
 
-  // Admin : générer le QR code d'entrée (workplace, permanent)
+  // Admin : générer le QR code d'entrée (workplace, permanent) — Pro uniquement
   @Get('workplace-qr')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, ProPlanGuard)
   @Roles('admin')
   getWorkplaceQR(@Request() req: { user: { orgId: number } }) {
     return this.pointageService.generateWorkplaceQR(req.user.orgId);
   }
 
-  // Admin : générer QR pour un créneau spécifique
+  // Admin : générer QR pour un créneau spécifique — Pro uniquement
   @Post('qr/:planningEntryId')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, ProPlanGuard)
   @Roles('admin')
   generateQR(@Param('planningEntryId', ParseIntPipe) id: number, @Request() req: { user: { orgId: number } }) {
     return this.pointageService.generateQR(id, req.user.orgId);
   }
 
-  // Admin : pointages du jour
+  // Admin : pointages du jour — Pro uniquement
   @Get('today')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, ProPlanGuard)
   @Roles('admin')
   getToday(@Request() req: { user: { orgId: number } }) {
     return this.pointageService.getToday(req.user.orgId);
   }
 
-  // Admin : pointage manuel
+  // Admin : pointage manuel — Pro uniquement
   @Post('manual')
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, ProPlanGuard)
   @Roles('admin')
   manual(
     @Body() body: { planningEntryId: number; employeeId: number; status: string; note?: string },

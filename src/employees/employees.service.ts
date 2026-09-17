@@ -1,8 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { FREE_PLAN_EMPLOYEE_LIMIT } from '../billing/billing.service';
 
 @Injectable()
 export class EmployeesService {
@@ -49,6 +50,20 @@ export class EmployeesService {
     if (!user?.orgId) {
       throw new ForbiddenException('Organisation manquante');
     }
+
+    const org = await this.prisma.organization.findUnique({
+      where: { id: user.orgId },
+      select: { plan: true },
+    });
+    if (org?.plan !== 'pro') {
+      const count = await this.prisma.employee.count({ where: { organizationId: user.orgId } });
+      if (count >= FREE_PLAN_EMPLOYEE_LIMIT) {
+        throw new BadRequestException(
+          `Limite du plan gratuit atteinte (${FREE_PLAN_EMPLOYEE_LIMIT} employés). Passez au plan Pro pour en ajouter davantage.`,
+        );
+      }
+    }
+
     const password = dto.password ?? 'temp-1234';
     const passwordHash = await bcrypt.hash(password, 10);
     return this.prisma.employee.create({

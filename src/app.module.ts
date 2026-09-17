@@ -10,6 +10,7 @@ import { RequestsModule } from './requests/requests.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { KeepAliveModule } from './keep-alive/keep-alive.module';
 import { PointageModule } from './pointage/pointage.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { PointageModule } from './pointage/pointage.module';
     InvitationModule,
     KeepAliveModule,
     PointageModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [],

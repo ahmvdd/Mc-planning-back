@@ -3,6 +3,8 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Le webhook Stripe doit recevoir le body brut (non parsé) pour vérifier la signature
+  app.use('/api/billing/webhook', require('express').raw({ type: 'application/json' }));
   app.use(require('express').json({ limit: '10mb' }));
   const prodOrigins = ["https://mc-planning-front.vercel.app", "https://www.shiftly.site", "https://shiftly.site"];
   app.enableCors({
