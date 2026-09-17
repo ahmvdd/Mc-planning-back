@@ -121,4 +121,42 @@ export class PlanningController {
     await this.planningService.remove(Number(id), req.user);
     return { status: 'deleted' };
   }
+
+  // ── Modèles de planning réutilisables ──────────────────────────────
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Get('templates')
+  findTemplates(@Req() req: { user?: { orgId?: number } }) {
+    return this.planningService.findTemplates(req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('templates/from-period/:periodId')
+  createTemplateFromPeriod(
+    @Param('periodId') periodId: string,
+    @Body() body: { name: string },
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    return this.planningService.createTemplateFromPeriod(Number(periodId), body.name, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Post('templates/:id/apply')
+  applyTemplate(
+    @Param('id') id: string,
+    @Body() body: { startDate: string },
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    return this.planningService.applyTemplate(Number(id), body.startDate, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Delete('templates/:id')
+  removeTemplate(@Param('id') id: string, @Req() req: { user?: { orgId?: number } }) {
+    return this.planningService.removeTemplate(Number(id), req.user);
+  }
 }

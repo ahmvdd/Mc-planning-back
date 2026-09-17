@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { CreatePlanningDto } from './dto/create-planning.dto';
 import { UpdatePlanningDto } from './dto/update-planning.dto';
 import { CreatePlanningPeriodDto } from './dto/create-planning-period.dto';
@@ -253,5 +253,98 @@ export class PlanningService {
       planningImageUrl: org?.planningImageUrl ?? null,
       planningImageUrl2: org?.planningImageUrl2 ?? null,
     };
+  }
+
+  // ── Modèles de planning réutilisables ──────────────────────────────
+
+  async findTemplates(user?: { orgId?: number }) {
+    if (!user?.orgId) throw new ForbiddenException('Organisation manquante');
+    return this.prisma.planningTemplate.findMany({
+      where: { organizationId: user.orgId },
+      include: { entries: { include: { employee: { select: { id: true, name: true } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createTemplateFromPeriod(periodId: number, name: string, user?: { orgId?: number }) {
+    if (!user?.orgId) throw new ForbiddenException('Organisation manquante');
+
+    const period = await this.prisma.planning.findFirst({
+      where: { id: periodId, organizationId: user.orgId },
+      include: { entries: true },
+    });
+    if (!period) throw new NotFoundException('Période introuvable');
+    if (period.entries.length === 0) {
+      throw new BadRequestException('Cette période ne contient aucun créneau à enregistrer');
+    }
+
+    return this.prisma.planningTemplate.create({
+      data: {
+        name,
+        organizationId: user.orgId,
+        entries: {
+          create: period.entries.map((e) => ({
+            dayOfWeek: this.toDayOfWeek(e.date),
+            shift: e.shift,
+            note: e.note,
+            employeeId: e.employeeId,
+          })),
+        },
+      },
+      include: { entries: true },
+    });
+  }
+
+  async applyTemplate(templateId: number, startDate: string, user?: { orgId?: number }) {
+    if (!user?.orgId) throw new ForbiddenException('Organisation manquante');
+
+    const template = await this.prisma.planningTemplate.findFirst({
+      where: { id: templateId, organizationId: user.orgId },
+      include: { entries: true },
+    });
+    if (!template) throw new NotFoundException('Modèle introuvable');
+
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    if (Number.isNaN(start.getTime())) throw new BadRequestException('Date de début invalide');
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 6);
+
+    return this.prisma.planning.create({
+      data: {
+        name: template.name,
+        startDate: start,
+        endDate: end,
+        organizationId: user.orgId,
+        entries: {
+          create: template.entries.map((e) => {
+            const date = new Date(start);
+            date.setUTCDate(date.getUTCDate() + e.dayOfWeek);
+            return {
+              date,
+              shift: e.shift,
+              note: e.note,
+              employeeId: e.employeeId,
+              organizationId: user.orgId as number,
+            };
+          }),
+        },
+      },
+      include: { entries: true },
+    });
+  }
+
+  async removeTemplate(id: number, user?: { orgId?: number }) {
+    if (!user?.orgId) throw new ForbiddenException('Organisation manquante');
+    const template = await this.prisma.planningTemplate.findFirst({
+      where: { id, organizationId: user.orgId },
+    });
+    if (!template) throw new NotFoundException('Modèle introuvable');
+    await this.prisma.planningTemplate.delete({ where: { id } });
+    return { success: true };
+  }
+
+  private toDayOfWeek(date: Date): number {
+    const jsDay = date.getUTCDay(); // 0 = dimanche ... 6 = samedi
+    return jsDay === 0 ? 6 : jsDay - 1; // 0 = lundi ... 6 = dimanche
   }
 }
