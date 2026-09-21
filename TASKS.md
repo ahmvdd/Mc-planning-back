@@ -3,7 +3,7 @@
 ## Bugs trouvés
 
 - [x] **Pointage — `orgId` vs `organizationId`** (corrigé le 2026-09-16) — `pointage.controller.ts` lisait `req.user.organizationId` (champ inexistant) au lieu de `req.user.orgId` (le vrai champ signé dans le JWT). Résultat : org id toujours `undefined` sur tous les endpoints pointage (scan, checkin, génération QR, pointages du jour, pointage manuel). Corrigé dans tous les endpoints du contrôleur.
-- [ ] **500 sur `/planning/periods` en prod** — la base de prod (Supabase) n'a probablement pas la migration `Planning`/périodes appliquée. Bloqué en attente de la connexion directe (port 5432, pas le pooler 6543) pour lancer `prisma migrate deploy`.
+- [x] **500 sur `/planning/periods` et `/auth/signup` en prod** (corrigé le 2026-09-21) — `prisma migrate deploy` (via `preDeployCommand` sur Render) n'avait plus appliqué aucune migration depuis début février malgré des dizaines de commits derrière, ET la base avait aussi des correctifs manuels ad-hoc jamais enregistrés dans `_prisma_migrations` (`Pointage`, `RequestLog`, `PlanningEntry.planningId` existaient déjà hors migration, avec en plus une contrainte FK manquante sur `RequestLog.requestId`). Diagnostiqué et rattrapé à la main via le SQL Editor Supabase (audit table par table + colonnes + contraintes FK avant d'écrire le script, tout appliqué dans une transaction). Signup admin et `/planning/periods` fonctionnent de nouveau en prod. Cause racine de `preDeployCommand` toujours pas identifiée — à surveiller sur le prochain déploiement Render pour voir s'il applique bien les futures migrations tout seul.
 
 ## En cours
 
@@ -15,8 +15,8 @@
 Contexte : ces produits sont matures, financés, avec plusieurs années d'itération. Cette liste sert de repère, pas d'objectif "tout faire avant de facturer" — priorise selon ce qui bloque vraiment les premiers clients.
 
 ### Priorité 1 — fiabilité de base (bloquant, avant tout le reste)
-- [ ] Corriger le 500 sur `/planning/periods` en prod (migration manquante)
-- [ ] Vérifier qu'il n'y a pas d'autres écarts de schéma entre prod et local (audit complet migration par migration)
+- [x] Corriger le 500 sur `/planning/periods` en prod (migration manquante) — fait le 2026-09-21
+- [ ] Comprendre pourquoi `preDeployCommand: npx prisma migrate deploy` ne s'exécute pas correctement sur Render (silencieux, aucune erreur visible côté déploiement) — sinon le même problème revient au prochain push de migration
 - [ ] Mettre en place un vrai monitoring d'erreurs (Sentry ou équivalent) — actuellement les bugs (comme celui du pointage) ne sont trouvés qu'en testant manuellement
 - [ ] Tests automatisés minimum sur les flux critiques (créer planning, pointer, inviter un employé) — zéro test actuellement, chaque changement peut recasser silencieusement
 - [ ] Déploiement fiable (auto-deploy vérifié, pas de dérive entre commits et prod comme on l'a vu)
@@ -30,9 +30,9 @@ Contexte : ces produits sont matures, financés, avec plusieurs années d'itéra
 ### Priorité 3 — fonctionnalités produit attendues
 - [ ] Gestion multi-sites (une organisation avec plusieurs lieux de travail, plannings séparés)
 - [ ] Planning en glisser-déposer (actuellement formulaire uniquement)
-- [ ] Modèles de planning réutilisables (semaine type)
+- [x] Modèles de planning réutilisables (semaine type) — fait le 2026-09-17
 - [ ] Suggestions automatiques de planning selon les disponibilités déclarées
-- [ ] Disponibilités employé (déclarer ses dispos, pas juste demander des congés)
+- [x] Disponibilités employé (déclarer ses dispos, pas juste demander des congés) — fait le 2026-09-17
 - [ ] Notifications push/SMS (actuellement rien, juste l'app web)
 
 ### Priorité 4 — mobile
