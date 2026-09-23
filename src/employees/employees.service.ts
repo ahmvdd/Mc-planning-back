@@ -64,6 +64,11 @@ export class EmployeesService {
       }
     }
 
+    const existing = await this.prisma.employee.findUnique({ where: { email: dto.email } });
+    if (existing) {
+      throw new BadRequestException('Un compte avec cet email existe déjà.');
+    }
+
     const password = dto.password ?? 'temp-1234';
     const passwordHash = await bcrypt.hash(password, 10);
     return this.prisma.employee.create({
