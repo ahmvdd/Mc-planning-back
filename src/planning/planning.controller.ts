@@ -16,7 +16,6 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { ProPlanGuard } from '../billing/pro-plan.guard';
 import { CreatePlanningDto } from './dto/create-planning.dto';
 import { UpdatePlanningDto } from './dto/update-planning.dto';
 import { CreatePlanningPeriodDto } from './dto/create-planning-period.dto';
@@ -65,7 +64,7 @@ export class PlanningController {
     return this.planningService.findAll(date, req.user);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard, ProPlanGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   @Post('import')
   @UseInterceptors(FileInterceptor('file'))
