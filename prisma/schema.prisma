@@ -25,6 +25,7 @@ model Employee {
   pointages Pointage[]
   availabilities Availability[]
   templateEntries PlanningTemplateEntry[]
+  notifications Notification[]
 }
 
 model Availability {
@@ -55,6 +56,7 @@ model Organization {
   pointages    Pointage[]
   availabilities Availability[]
   planningTemplates PlanningTemplate[]
+  notifications Notification[]
   createdAt    DateTime  @default(now())
 
   plan                 String    @default("free")
@@ -146,6 +148,22 @@ model Pointage {
   scannedAt       DateTime      @default(now())
   status          String        // present | late | absent | manual
   note            String?
+}
+
+model Notification {
+  id             Int          @id @default(autoincrement())
+  employeeId     Int
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  type           String
+  title          String
+  message        String
+  link           String?
+  read           Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([employeeId, read])
 }
 
 model RequestLog {

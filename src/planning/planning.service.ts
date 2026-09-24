@@ -3,11 +3,15 @@ import { CreatePlanningDto } from './dto/create-planning.dto';
 import { UpdatePlanningDto } from './dto/update-planning.dto';
 import { CreatePlanningPeriodDto } from './dto/create-planning-period.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as XLSX from 'xlsx';
 
 @Injectable()
 export class PlanningService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   // ── Planning Periods ─────────────────────────────────────────────
 
@@ -74,7 +78,7 @@ export class PlanningService {
     if (!user?.orgId) {
       throw new ForbiddenException('Organisation manquante');
     }
-    return this.prisma.planningEntry.create({
+    const entry = await this.prisma.planningEntry.create({
       data: {
         date: new Date(dto.date),
         shift: dto.shift,
@@ -84,6 +88,19 @@ export class PlanningService {
         planningId: dto.planningId ?? null,
       } as any,
     });
+    if (entry.employeeId) {
+      await this.notificationsService
+        .notify(
+          entry.employeeId,
+          user.orgId,
+          'planning_assigned',
+          'Nouveau créneau',
+          `Un créneau vous a été assigné le ${this.formatDate(entry.date)} (${entry.shift}).`,
+          '/planning',
+        )
+        .catch(() => undefined);
+    }
+    return entry;
   }
 
   async update(id: number, dto: UpdatePlanningDto, user?: { orgId?: number }) {
@@ -217,6 +234,8 @@ export class PlanningService {
       toInsert.map(entry => this.prisma.planningEntry.create({ data: entry }))
     );
 
+    await this.notifyAffectedEmployees(insertedEntries.map((e) => e.employeeId), orgId);
+
     return {
       created: insertedEntries.length,
       errors,
@@ -309,7 +328,7 @@ export class PlanningService {
     const end = new Date(start);
     end.setUTCDate(end.getUTCDate() + 6);
 
-    return this.prisma.planning.create({
+    const period = await this.prisma.planning.create({
       data: {
         name: template.name,
         startDate: start,
@@ -331,6 +350,10 @@ export class PlanningService {
       },
       include: { entries: true },
     });
+
+    await this.notifyAffectedEmployees(period.entries.map((e) => e.employeeId), user.orgId);
+
+    return period;
   }
 
   async removeTemplate(id: number, user?: { orgId?: number }) {
@@ -346,5 +369,27 @@ export class PlanningService {
   private toDayOfWeek(date: Date): number {
     const jsDay = date.getUTCDay(); // 0 = dimanche ... 6 = samedi
     return jsDay === 0 ? 6 : jsDay - 1; // 0 = lundi ... 6 = dimanche
+  }
+
+  private formatDate(date: Date): string {
+    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+  }
+
+  private async notifyAffectedEmployees(
+    employeeIds: (number | null)[],
+    orgId: number,
+  ) {
+    const ids = employeeIds.filter((id): id is number => id !== null);
+    if (ids.length === 0) return;
+    await this.notificationsService
+      .notifyMany(
+        ids,
+        orgId,
+        'planning_assigned',
+        'Planning mis à jour',
+        'Votre planning a été mis à jour avec de nouveaux créneaux.',
+        '/planning',
+      )
+      .catch(() => undefined);
   }
 }

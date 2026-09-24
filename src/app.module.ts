@@ -13,6 +13,8 @@ import { PointageModule } from './pointage/pointage.module';
 import { BillingModule } from './billing/billing.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { LeadsModule } from './leads/leads.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { LeadsModule } from './leads/leads.module';
     BillingModule,
     AvailabilityModule,
     LeadsModule,
+    NotificationsModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [],

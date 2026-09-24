@@ -1,11 +1,35 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Request as RequestModel } from '@prisma/client';
+import { Resend } from 'resend';
 import { CreateRequestDto } from './dto/create-request.dto';
 import { UpdateRequestDto } from './dto/update-request.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+const STATUS_LABELS: Record<string, string> = {
+  approved: 'approuvée',
+  rejected: 'refusée',
+  office: 'convocation au bureau',
+  pending: 'remise en attente',
+};
 
 @Injectable()
 export class RequestsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private get resend() {
+    return new Resend(process.env.RESEND_API_KEY ?? 'no-key');
+  }
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
+
+  private async sendMail(to: string, subject: string, html: string) {
+    if (!process.env.RESEND_API_KEY) return;
+    await this.resend.emails
+      .send({ from: process.env.RESEND_FROM ?? 'Shiftly <onboarding@resend.dev>', to: [to], subject, html })
+      .catch(() => undefined);
+  }
 
   async findAll(
     employeeId?: number,
@@ -67,8 +91,8 @@ export class RequestsService {
       throw new ForbiddenException('Employé manquant');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const request = await tx.request.create({
+    const request = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.request.create({
         data: {
           employeeId,
           type: dto.type,
@@ -81,14 +105,43 @@ export class RequestsService {
 
       await tx.requestLog.create({
         data: {
-          requestId: request.id,
+          requestId: created.id,
           action: 'created',
           byEmployeeId: user.sub ?? null,
         },
       });
 
-      return request;
+      return created;
     });
+
+    const [requester, admins] = await Promise.all([
+      this.prisma.employee.findUnique({ where: { id: employeeId }, select: { name: true } }),
+      this.prisma.employee.findMany({
+        where: { organizationId: user.orgId, role: 'admin' },
+        select: { id: true, email: true },
+      }),
+    ]);
+
+    const requesterName = requester?.name ?? 'Un employé';
+    await this.notificationsService.notifyMany(
+      admins.map((a) => a.id),
+      user.orgId,
+      'request_created',
+      'Nouvelle demande',
+      `${requesterName} a soumis une demande : ${dto.type}.`,
+      '/requests',
+    );
+    await Promise.all(
+      admins.map((a) =>
+        this.sendMail(
+          a.email,
+          `Nouvelle demande de ${requesterName}`,
+          `<p>${requesterName} vient de soumettre une demande <strong>${dto.type}</strong>.</p><p>${dto.message ?? ''}</p>`,
+        ),
+      ),
+    );
+
+    return request;
   }
 
   async update(
@@ -99,17 +152,19 @@ export class RequestsService {
     if (!user?.orgId) {
       throw new ForbiddenException('Organisation manquante');
     }
+    let request: RequestModel | null;
+    let updated: RequestModel;
     try {
-      const request = await this.prisma.request.findFirst({
+      request = await this.prisma.request.findFirst({
         where: { id, organizationId: user.orgId },
       });
       if (!request) {
         throw new NotFoundException('Demande introuvable');
       }
 
-      return await this.prisma.$transaction(async (tx) => {
-        const updated = await tx.request.update({
-          where: { id: request.id },
+      updated = await this.prisma.$transaction(async (tx) => {
+        const result = await tx.request.update({
+          where: { id: request!.id },
           data: {
             status: dto.status,
             message: dto.message,
@@ -118,7 +173,7 @@ export class RequestsService {
           } as any,
         });
 
-        if (dto.status && dto.status !== request.status) {
+        if (dto.status && dto.status !== request!.status) {
           await tx.requestLog.create({
             data: {
               requestId: id,
@@ -129,11 +184,38 @@ export class RequestsService {
           });
         }
 
-        return updated;
+        return result;
       });
     } catch {
       throw new NotFoundException('Demande introuvable');
     }
+
+    if (dto.status && dto.status !== request.status && dto.status !== 'pending') {
+      const employee = await this.prisma.employee.findUnique({
+        where: { id: updated.employeeId },
+        select: { name: true, email: true },
+      });
+      const statusLabel = STATUS_LABELS[dto.status] ?? dto.status;
+      await this.notificationsService
+        .notify(
+          updated.employeeId,
+          user.orgId,
+          'request_status',
+          'Demande mise à jour',
+          `Votre demande "${updated.type}" a été ${statusLabel}.${dto.adminMessage ? ` Note : ${dto.adminMessage}` : ''}`,
+          '/requests',
+        )
+        .catch(() => undefined);
+      if (employee?.email) {
+        await this.sendMail(
+          employee.email,
+          `Votre demande a été ${statusLabel}`,
+          `<p>Votre demande <strong>${updated.type}</strong> a été <strong>${statusLabel}</strong>.</p>${dto.adminMessage ? `<p>Note : ${dto.adminMessage}</p>` : ''}`,
+        );
+      }
+    }
+
+    return updated;
   }
 
   async remove(id: number, user?: { orgId?: number }): Promise<void> {
