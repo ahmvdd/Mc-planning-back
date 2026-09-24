@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { Request as RequestModel } from '@prisma/client';
 import { Resend } from 'resend';
 import { CreateRequestDto } from './dto/create-request.dto';
@@ -15,6 +15,8 @@ const STATUS_LABELS: Record<string, string> = {
 
 @Injectable()
 export class RequestsService {
+  private readonly logger = new Logger(RequestsService.name);
+
   private get resend() {
     return new Resend(process.env.RESEND_API_KEY ?? 'no-key');
   }
@@ -26,9 +28,17 @@ export class RequestsService {
 
   private async sendMail(to: string, subject: string, html: string) {
     if (!process.env.RESEND_API_KEY) return;
-    await this.resend.emails
-      .send({ from: process.env.RESEND_FROM ?? 'Shiftly <onboarding@resend.dev>', to: [to], subject, html })
-      .catch(() => undefined);
+    try {
+      const { error } = await this.resend.emails.send({
+        from: process.env.RESEND_FROM ?? 'Shiftly <onboarding@resend.dev>',
+        to: [to],
+        subject,
+        html,
+      });
+      if (error) this.logger.error(`Échec envoi email à ${to}: ${JSON.stringify(error)}`);
+    } catch (err) {
+      this.logger.error(`Échec envoi email à ${to}: ${(err as Error).message}`);
+    }
   }
 
   async findAll(

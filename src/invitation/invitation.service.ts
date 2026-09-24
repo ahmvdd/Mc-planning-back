@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { Resend } from 'resend';
@@ -7,6 +7,8 @@ import { FREE_PLAN_EMPLOYEE_LIMIT } from '../billing/billing.service';
 
 @Injectable()
 export class InvitationService {
+  private readonly logger = new Logger(InvitationService.name);
+
   private get resend() {
     return new Resend(process.env.RESEND_API_KEY ?? 'no-key');
   }
@@ -38,10 +40,10 @@ export class InvitationService {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-    // Récupère le nom de l'organisation
+    // Récupère le nom et le code de l'organisation
     const org = await this.prisma.organization.findUnique({
       where: { id: orgId },
-      select: { name: true },
+      select: { name: true, code: true },
     });
 
     // Supprime les invitations précédentes non utilisées pour ce mail dans cette org
@@ -56,40 +58,61 @@ export class InvitationService {
 
     const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
     const inviteUrl = `${frontendUrl}/invitation/${token}`;
+    const manualSignupUrl = `${frontendUrl}/signup/employee?code=${org?.code ?? ''}`;
 
     // Envoie l'email
-    await this.resend.emails.send({
+    let sendError: unknown = null;
+    try {
+      const result = await this.resend.emails.send({
       from: process.env.RESEND_FROM ?? 'Shiftly <onboarding@resend.dev>',
       to: [email],
       subject: `Invitation à rejoindre ${org?.name ?? 'Shiftly'}`,
       html: `
         <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto; padding: 32px;">
-          <div style="background: linear-gradient(135deg, #4f46e5, #0ea5e9); border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 32px;">
+          <div style="background: #0a0a0a; border-radius: 16px; padding: 32px; text-align: center; margin-bottom: 32px;">
             <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 800;">Shiftly</h1>
-            <p style="color: rgba(255,255,255,0.8); margin: 8px 0 0;">Gestion de planning d'équipe</p>
+            <p style="color: rgba(255,255,255,0.6); margin: 8px 0 0;">Gestion de planning d'équipe</p>
           </div>
 
-          <h2 style="color: #0f172a; font-size: 22px;">Vous avez été invité(e) !</h2>
+          <h2 style="color: #0f172a; font-size: 22px;">Invitation reçue !</h2>
           <p style="color: #475569; line-height: 1.6;">
-            <strong>${org?.name ?? 'Votre responsable'}</strong> vous invite à rejoindre l'espace de gestion de planning Shiftly.
+            <strong>${org?.name ?? 'Votre responsable'}</strong> vous invite à rejoindre son organisation sur Shiftly.
+            Venez vous inscrire et rejoindre l'équipe.
           </p>
           <p style="color: #475569; line-height: 1.6;">
-            Cliquez sur le bouton ci-dessous pour créer votre compte. Ce lien est valable <strong>48 heures</strong>.
+            Cliquez sur le bouton ci-dessous pour créer votre compte en un clic. Ce lien est valable <strong>48 heures</strong>.
           </p>
 
           <div style="text-align: center; margin: 32px 0;">
-            <a href="${inviteUrl}" style="background: #4f46e5; color: white; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block;">
+            <a href="${inviteUrl}" style="background: #B4FF39; color: #0a0a0a; text-decoration: none; padding: 14px 32px; border-radius: 12px; font-weight: 700; font-size: 15px; display: inline-block;">
               Créer mon compte →
             </a>
           </div>
 
-          <p style="color: #94a3b8; font-size: 13px; margin-top: 32px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
-            Si vous ne vous attendiez pas à cette invitation, ignorez cet email.<br/>
-            Lien : ${inviteUrl}
+          <div style="background: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+            <p style="color: #64748b; font-size: 13px; margin: 0 0 8px;">Le lien ne fonctionne pas ? Inscrivez-vous manuellement avec le code de l'organisation :</p>
+            <p style="color: #0f172a; font-size: 20px; font-weight: 800; letter-spacing: 2px; margin: 0 0 10px; font-family: monospace;">${org?.code ?? '—'}</p>
+            <a href="${manualSignupUrl}" style="color: #4d7c0f; font-size: 13px; font-weight: 700;">${manualSignupUrl}</a>
+          </div>
+
+          <p style="color: #94a3b8; font-size: 13px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+            Si vous ne vous attendiez pas à cette invitation, ignorez cet email.
           </p>
         </div>
       `,
-    });
+      });
+      sendError = result.error;
+    } catch (err) {
+      sendError = err instanceof Error ? err.message : err;
+    }
+
+    if (sendError) {
+      this.logger.error(`Échec envoi invitation à ${email}: ${JSON.stringify(sendError)}`);
+      await this.prisma.invitation.deleteMany({ where: { email, organizationId: orgId, usedAt: null } });
+      throw new BadRequestException(
+        "L'email d'invitation n'a pas pu être envoyé. Vérifiez la configuration Resend (clé API, domaine d'envoi).",
+      );
+    }
 
     return { success: true, email };
   }
