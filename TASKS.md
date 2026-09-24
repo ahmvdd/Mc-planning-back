@@ -31,9 +31,9 @@ Contexte : ces produits sont matures, financés, avec plusieurs années d'itéra
 - [ ] Gestion multi-sites (une organisation avec plusieurs lieux de travail, plannings séparés)
 - [ ] Planning en glisser-déposer (actuellement formulaire uniquement)
 - [x] Modèles de planning réutilisables (semaine type) — fait le 2026-09-17
-- [ ] Suggestions automatiques de planning selon les disponibilités déclarées
+- [ ] **Génération de planning par IA** — bouton "Générer avec l'IA" sur une période : envoie employés + disponibilités + contraintes (repos 11h, pas de chevauchement, max 35h/semaine) à l'API Claude via tool-use (schéma `propose_planning` forcé), l'admin review le brouillon avant de l'appliquer (crée la période + les créneaux, déclenche les notifications existantes). Nécessite une clé `ANTHROPIC_API_KEY` dans `.env` (à créer sur console.anthropic.com) + `npm i @anthropic-ai/sdk`. Discuté et conçu le 2026-09-24, pas encore codé — reprendre ici.
 - [x] Disponibilités employé (déclarer ses dispos, pas juste demander des congés) — fait le 2026-09-17
-- [ ] Notifications push/SMS (actuellement rien, juste l'app web)
+- [x] Notifications in-app + email (nouvelle demande RH, statut de demande, créneau assigné) — fait le 2026-09-24. Reste : notifications push/SMS (rien pour l'instant côté mobile).
 
 ### Priorité 4 — mobile
 - [ ] App mobile native iOS/Android (ou au minimum PWA installable avec notifications push) — actuellement web responsive uniquement
