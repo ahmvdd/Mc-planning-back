@@ -86,10 +86,13 @@ export class EmployeesService {
 
   async updateMe(
     data: { name?: string; password?: string },
-    user?: { orgId?: number; sub?: number },
+    user?: { orgId?: number; sub?: number; role?: string },
   ) {
     if (!user?.orgId || !user?.sub) {
       throw new ForbiddenException('Non authentifié');
+    }
+    if (data.name?.trim() && user.role !== 'admin') {
+      throw new ForbiddenException('Seul un administrateur peut modifier votre nom. Contactez votre manager.');
     }
     const updateData: Record<string, unknown> = {};
     if (data.name?.trim()) updateData.name = data.name.trim();

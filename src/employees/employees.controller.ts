@@ -76,7 +76,7 @@ export class EmployeesController {
   @Patch('me')
   updateMe(
     @Body() body: { name?: string; password?: string },
-    @Req() req: { user?: { orgId?: number; sub?: number } },
+    @Req() req: { user?: { orgId?: number; sub?: number; role?: string } },
   ) {
     return this.employeesService.updateMe(body, req.user);
   }
