@@ -25,6 +25,9 @@ export class AuthService {
     if (user.status === 'invited') {
       throw new UnauthorizedException('Veuillez accepter votre invitation par email avant de vous connecter');
     }
+    if (user.status === 'pending') {
+      throw new UnauthorizedException('Votre demande d\'adhésion est en attente de validation par un administrateur');
+    }
 
     const tokens = await this.issueTokens(user.id, user.email, user.role, user.organizationId);
     await this.storeRefreshTokenHash(user.id, tokens.refreshToken);
@@ -103,23 +106,22 @@ export class AuthService {
       throw new BadRequestException('Organisation introuvable');
     }
 
+    // Auto-inscription via code d'organisation : compte créé en attente,
+    // un admin doit valider avant que la personne puisse se connecter.
     const user = await this.prisma.employee.create({
       data: {
         name: dto.name,
         email: dto.email,
         role: dto.role,
-        status: dto.status ?? 'active',
+        status: 'pending',
         password: hashedPassword,
         organizationId: organization.id,
       },
     });
 
-    const tokens = await this.issueTokens(user.id, user.email, user.role, user.organizationId);
-    await this.storeRefreshTokenHash(user.id, tokens.refreshToken);
-
     return {
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
+      pending: true,
+      message: 'Votre demande a été envoyée. Un administrateur doit valider votre compte avant que vous puissiez vous connecter.',
       user: {
         id: user.id,
         name: user.name,
