@@ -4,10 +4,62 @@ import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { FREE_PLAN_EMPLOYEE_LIMIT } from '../billing/billing.service';
+import { InvitationService } from '../invitation/invitation.service';
 
 @Injectable()
 export class EmployeesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly invitationService: InvitationService,
+  ) {}
+
+  async approveJoinRequest(id: number, user?: { orgId?: number }) {
+    if (!user?.orgId) {
+      throw new ForbiddenException('Organisation manquante');
+    }
+    const employee = await this.prisma.employee.findFirst({
+      where: { id, organizationId: user.orgId },
+    });
+    if (!employee) {
+      throw new NotFoundException('Demande introuvable');
+    }
+    if (employee.status !== 'pending' && employee.status !== 'requested') {
+      throw new BadRequestException('Cette demande a déjà été traitée');
+    }
+
+    if (employee.status === 'requested') {
+      // Compte créé sans mot de passe réel (demande via code) : on le
+      // supprime et on envoie une invitation email classique pour que
+      // la personne choisisse elle-même son mot de passe.
+      await this.prisma.employee.delete({ where: { id: employee.id } });
+      try {
+        await this.invitationService.sendInvitation(employee.email, user.orgId);
+      } catch (err) {
+        // L'envoi a échoué : on restaure la demande pour ne pas la perdre.
+        await this.prisma.employee.create({
+          data: {
+            name: employee.name,
+            email: employee.email,
+            role: employee.role,
+            status: 'requested',
+            password: employee.password,
+            organizationId: employee.organizationId,
+          },
+        });
+        throw err;
+      }
+      return { success: true, invited: true };
+    }
+
+    // status === 'pending' : mot de passe déjà choisi lors de l'inscription,
+    // il suffit d'activer le compte.
+    const activated = await this.prisma.employee.update({
+      where: { id: employee.id },
+      data: { status: 'active' },
+      select: { id: true, name: true, email: true, role: true, status: true },
+    });
+    return { success: true, invited: false, employee: activated };
+  }
 
   async findAll(user?: { orgId?: number; role?: string; sub?: number }) {
     if (!user?.orgId) {

@@ -19,6 +19,11 @@ export class AuthController {
     return this.authService.signup(dto);
   }
 
+  @Post('join-request')
+  joinRequest(@Body() dto: { email: string; orgCode: string }) {
+    return this.authService.joinRequest(dto.email, dto.orgCode);
+  }
+
   @Post('refresh')
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshTokens(dto.refreshToken);

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -25,7 +26,7 @@ export class AuthService {
     if (user.status === 'invited') {
       throw new UnauthorizedException('Veuillez accepter votre invitation par email avant de vous connecter');
     }
-    if (user.status === 'pending') {
+    if (user.status === 'pending' || user.status === 'requested') {
       throw new UnauthorizedException('Votre demande d\'adhésion est en attente de validation par un administrateur');
     }
 
@@ -130,6 +131,48 @@ export class AuthService {
         status: user.status,
         organizationId: user.organizationId,
       },
+    };
+  }
+
+  async joinRequest(email: string, orgCode: string) {
+    if (!email || !orgCode) {
+      throw new BadRequestException('Email et code organisation requis');
+    }
+
+    const organization = await this.prisma.organization.findUnique({
+      where: { code: orgCode.toUpperCase().trim() },
+    });
+    if (!organization) {
+      throw new BadRequestException('Organisation introuvable');
+    }
+
+    const existing = await this.prisma.employee.findUnique({ where: { email } });
+    if (existing) {
+      throw new BadRequestException(
+        existing.status === 'requested' || existing.status === 'pending'
+          ? 'Une demande est déjà en attente pour cet email'
+          : 'Un compte avec cet email existe déjà',
+      );
+    }
+
+    const placeholderName = email.split('@')[0].replace(/[._-]+/g, ' ').trim() || email;
+    const randomPassword = crypto.randomBytes(24).toString('hex');
+    const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+    await this.prisma.employee.create({
+      data: {
+        name: placeholderName,
+        email,
+        role: 'employee',
+        status: 'requested',
+        password: hashedPassword,
+        organizationId: organization.id,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Votre demande a été envoyée. Un administrateur doit valider votre compte.',
     };
   }
 

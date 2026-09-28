@@ -83,6 +83,18 @@ export class EmployeesController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
+  @Post(':id/approve-join')
+  approveJoinRequest(
+    @Param('id') id: string,
+    @Req() req: { user?: { orgId?: number } },
+  ) {
+    const numId = Number(id);
+    if (!Number.isInteger(numId)) throw new BadRequestException('id invalide');
+    return this.employeesService.approveJoinRequest(numId, req.user);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Patch(':id')
   update(
     @Param('id') id: string,
