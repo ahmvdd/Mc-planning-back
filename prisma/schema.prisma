@@ -26,6 +26,8 @@ model Employee {
   availabilities    Availability[]
   templateEntries   PlanningTemplateEntry[]
   notifications     Notification[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 
   @@index([organizationId])
 }
@@ -62,6 +64,7 @@ model Organization {
   planningTemplates PlanningTemplate[]
   notifications     Notification[]
   createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   plan                 String    @default("free")
   subscriptionStatus   String?
@@ -79,6 +82,7 @@ model Planning {
   organization   Organization    @relation(fields: [organizationId], references: [id])
   entries        PlanningEntry[]
   createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@index([organizationId])
 }
@@ -95,6 +99,8 @@ model PlanningEntry {
   planningId     Int?
   planning       Planning?    @relation(fields: [planningId], references: [id], onDelete: Cascade)
   pointages      Pointage[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([organizationId])
   @@index([organizationId, date])
@@ -107,6 +113,7 @@ model PlanningTemplate {
   organization   Organization            @relation(fields: [organizationId], references: [id])
   entries        PlanningTemplateEntry[]
   createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 
   @@index([organizationId])
 }
@@ -147,6 +154,7 @@ model Request {
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id])
   createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   logs           RequestLog[]
 
   @@index([organizationId])
