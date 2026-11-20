@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { DateTime } from 'luxon';
 import { PrismaService } from '../prisma/prisma.service';
 import * as QRCode from 'qrcode';
 
@@ -7,18 +8,29 @@ const QR_SECRET = process.env.JWT_SECRET + '_qr';
 const QR_VALIDITY_HOURS = 8;
 const LATE_THRESHOLD_MINUTES = 15;
 const WORKPLACE_QR_SECRET = process.env.JWT_SECRET + '_workplace';
+const BUSINESS_TIMEZONE = 'Europe/Paris';
 
-// Extrait l'heure de début depuis le champ shift et la combine avec la date du créneau
-// Gère : "08h-16h", "08h00-16h00", "08:00 - 16:00", "Matin 8h-16h", "8h30 – 16h", etc.
+// Bornes du jour calendaire courant côté Europe/Paris (et non celui du
+// serveur, qui tourne en UTC sur Render — sans ça un check-in à 00h30
+// heure de Paris en hiver cherchait le créneau de la veille).
+function businessDayRange(): { start: Date; end: Date } {
+  const start = DateTime.now().setZone(BUSINESS_TIMEZONE).startOf('day');
+  return { start: start.toJSDate(), end: start.plus({ days: 1 }).toJSDate() };
+}
+
+// Extrait l'heure de début depuis le champ shift (pensée comme heure locale
+// Europe/Paris, celle que les managers saisissent) et la combine avec la
+// date du créneau. Gère : "08h-16h", "08h00-16h00", "08:00 - 16:00",
+// "Matin 8h-16h", "8h30 – 16h", etc.
 function parseShiftStart(shift: string, entryDate: Date): Date {
+  const utcDay = DateTime.fromJSDate(entryDate, { zone: 'utc' });
   const m = shift.match(/(\d{1,2})[h:](\d{0,2})/i);
-  const base = new Date(entryDate);
-  if (m) {
-    const hours = parseInt(m[1], 10);
-    const minutes = parseInt(m[2] || '0', 10);
-    base.setUTCHours(hours, minutes, 0, 0);
-  }
-  return base;
+  const hour = m ? parseInt(m[1], 10) : 0;
+  const minute = m ? parseInt(m[2] || '0', 10) : 0;
+  return DateTime.fromObject(
+    { year: utcDay.year, month: utcDay.month, day: utcDay.day, hour, minute },
+    { zone: BUSINESS_TIMEZONE },
+  ).toJSDate();
 }
 
 @Injectable()
@@ -125,10 +137,7 @@ export class PointageService {
     }
 
     // Trouver le shift de l'employé aujourd'hui
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const { start: today, end: tomorrow } = businessDayRange();
 
     const entry = await this.prisma.planningEntry.findFirst({
       where: {
@@ -175,10 +184,7 @@ export class PointageService {
 
   // ── Admin : pointages du jour ──
   async getToday(orgId: number) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const { start: today, end: tomorrow } = businessDayRange();
 
     // Tous les créneaux du jour
     const entries = await this.prisma.planningEntry.findMany({
