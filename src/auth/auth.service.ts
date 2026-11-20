@@ -29,6 +29,9 @@ export class AuthService {
     if (user.status === 'pending' || user.status === 'requested') {
       throw new UnauthorizedException('Votre demande d\'adhésion est en attente de validation par un administrateur');
     }
+    if (user.status === 'removed') {
+      throw new UnauthorizedException('Ce compte a été désactivé');
+    }
 
     const tokens = await this.issueTokens(user.id, user.email, user.role, user.organizationId);
     await this.storeRefreshTokenHash(user.id, tokens.refreshToken);
@@ -181,7 +184,7 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync<{ sub: number; email: string; role: string; orgId: number }>(
         refreshToken,
         {
-          secret: process.env.JWT_REFRESH_SECRET || 'mcplanning-refresh-secret',
+          secret: process.env.JWT_REFRESH_SECRET,
         },
       );
 
@@ -229,7 +232,7 @@ export class AuthService {
     const accessToken = await this.jwtService.signAsync(payload);
     const refreshExpiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as JwtSignOptions['expiresIn'];
     const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_REFRESH_SECRET || 'mcplanning-refresh-secret',
+      secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: refreshExpiresIn,
     });
 

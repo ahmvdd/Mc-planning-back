@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
@@ -73,7 +74,7 @@ export class EmployeesService {
     }
 
     return this.prisma.employee.findMany({
-      where: { organizationId: user.orgId },
+      where: { organizationId: user.orgId, status: { not: 'removed' } },
       select: { id: true, name: true, email: true, role: true, status: true },
     });
   }
@@ -169,20 +170,32 @@ export class EmployeesService {
     }
   }
 
-  async remove(id: number, user?: { orgId?: number }): Promise<void> {
+  async remove(id: number, user?: { orgId?: number }): Promise<{ status: 'deleted' | 'deactivated' }> {
     if (!user?.orgId) {
       throw new ForbiddenException('Organisation manquante');
     }
-    try {
-      const employee = await this.prisma.employee.findFirst({
-        where: { id, organizationId: user.orgId },
-      });
-      if (!employee) {
-        throw new NotFoundException('Employé introuvable');
-      }
-      await this.prisma.employee.delete({ where: { id: employee.id } });
-    } catch {
+    const employee = await this.prisma.employee.findFirst({
+      where: { id, organizationId: user.orgId },
+    });
+    if (!employee) {
       throw new NotFoundException('Employé introuvable');
+    }
+
+    try {
+      await this.prisma.employee.delete({ where: { id: employee.id } });
+      return { status: 'deleted' };
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+        // L'employé a de l'historique lié (pointages, demandes, créneaux) :
+        // le supprimer casserait cet historique. On désactive le compte à la
+        // place — il disparaît des listes actives mais son historique reste intact.
+        await this.prisma.employee.update({
+          where: { id: employee.id },
+          data: { status: 'removed' },
+        });
+        return { status: 'deactivated' };
+      }
+      throw err;
     }
   }
 

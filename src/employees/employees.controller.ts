@@ -112,7 +112,6 @@ export class EmployeesController {
   remove(@Param('id') id: string, @Req() req: { user?: { orgId?: number } }) {
     const numId = Number(id);
     if (!Number.isInteger(numId)) throw new BadRequestException('id invalide');
-    this.employeesService.remove(numId, req.user);
-    return { status: 'deleted' };
+    return this.employeesService.remove(numId, req.user);
   }
 }
