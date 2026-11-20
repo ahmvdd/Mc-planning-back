@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
@@ -13,6 +17,7 @@ export class AuthService {
   ) {}
 
   async login(email: string, password: string) {
+    email = email.trim().toLowerCase();
     const user = await this.prisma.employee.findUnique({ where: { email } });
     if (!user) {
       throw new UnauthorizedException('Identifiants invalides');
@@ -24,16 +29,25 @@ export class AuthService {
     }
 
     if (user.status === 'invited') {
-      throw new UnauthorizedException('Veuillez accepter votre invitation par email avant de vous connecter');
+      throw new UnauthorizedException(
+        'Veuillez accepter votre invitation par email avant de vous connecter',
+      );
     }
     if (user.status === 'pending' || user.status === 'requested') {
-      throw new UnauthorizedException('Votre demande d\'adhésion est en attente de validation par un administrateur');
+      throw new UnauthorizedException(
+        "Votre demande d'adhésion est en attente de validation par un administrateur",
+      );
     }
     if (user.status === 'removed') {
       throw new UnauthorizedException('Ce compte a été désactivé');
     }
 
-    const tokens = await this.issueTokens(user.id, user.email, user.role, user.organizationId);
+    const tokens = await this.issueTokens(
+      user.id,
+      user.email,
+      user.role,
+      user.organizationId,
+    );
     await this.storeRefreshTokenHash(user.id, tokens.refreshToken);
 
     return {
@@ -51,43 +65,62 @@ export class AuthService {
   }
 
   async signup(dto: SignupDto) {
-    const existing = await this.prisma.employee.findUnique({ where: { email: dto.email } });
-    if (existing) throw new BadRequestException('Un compte avec cet email existe déjà');
+    dto.email = dto.email.trim().toLowerCase();
+    const existing = await this.prisma.employee.findUnique({
+      where: { email: dto.email },
+    });
+    if (existing)
+      throw new BadRequestException('Un compte avec cet email existe déjà');
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
 
     if (dto.role === 'admin') {
       const code = Math.random().toString(36).slice(2, 8).toUpperCase();
-      const organization = await this.prisma.organization.create({
-        data: {
-          name: dto.orgName ?? dto.name,
-          code,
+
+      // Organization + Employee + ownerId doivent être cohérents entre eux :
+      // un crash entre ces écritures laisserait une org sans propriétaire ou
+      // un employé orphelin. On les regroupe dans une transaction.
+      const { user, organizationCode } = await this.prisma.$transaction(
+        async (tx) => {
+          const organization = await tx.organization.create({
+            data: {
+              name: dto.orgName ?? dto.name,
+              code,
+            },
+          });
+
+          const created = await tx.employee.create({
+            data: {
+              name: dto.name,
+              email: dto.email,
+              role: dto.role,
+              status: dto.status ?? 'active',
+              password: hashedPassword,
+              organizationId: organization.id,
+            },
+          });
+
+          await tx.organization.update({
+            where: { id: organization.id },
+            data: { ownerId: created.id },
+          });
+
+          return { user: created, organizationCode: organization.code };
         },
-      });
+      );
 
-      const user = await this.prisma.employee.create({
-        data: {
-          name: dto.name,
-          email: dto.email,
-          role: dto.role,
-          status: dto.status ?? 'active',
-          password: hashedPassword,
-          organizationId: organization.id,
-        },
-      });
-
-      await this.prisma.organization.update({
-        where: { id: organization.id },
-        data: { ownerId: user.id },
-      });
-
-      const tokens = await this.issueTokens(user.id, user.email, user.role, user.organizationId);
+      const tokens = await this.issueTokens(
+        user.id,
+        user.email,
+        user.role,
+        user.organizationId,
+      );
       await this.storeRefreshTokenHash(user.id, tokens.refreshToken);
 
       return {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
-        organizationCode: organization.code,
+        organizationCode,
         user: {
           id: user.id,
           name: user.name,
@@ -125,7 +158,8 @@ export class AuthService {
 
     return {
       pending: true,
-      message: 'Votre demande a été envoyée. Un administrateur doit valider votre compte avant que vous puissiez vous connecter.',
+      message:
+        'Votre demande a été envoyée. Un administrateur doit valider votre compte avant que vous puissiez vous connecter.',
       user: {
         id: user.id,
         name: user.name,
@@ -141,6 +175,7 @@ export class AuthService {
     if (!email || !orgCode) {
       throw new BadRequestException('Email et code organisation requis');
     }
+    email = email.trim().toLowerCase();
 
     const organization = await this.prisma.organization.findUnique({
       where: { code: orgCode.toUpperCase().trim() },
@@ -149,7 +184,9 @@ export class AuthService {
       throw new BadRequestException('Organisation introuvable');
     }
 
-    const existing = await this.prisma.employee.findUnique({ where: { email } });
+    const existing = await this.prisma.employee.findUnique({
+      where: { email },
+    });
     if (existing) {
       throw new BadRequestException(
         existing.status === 'requested' || existing.status === 'pending'
@@ -158,7 +195,11 @@ export class AuthService {
       );
     }
 
-    const placeholderName = email.split('@')[0].replace(/[._-]+/g, ' ').trim() || email;
+    const placeholderName =
+      email
+        .split('@')[0]
+        .replace(/[._-]+/g, ' ')
+        .trim() || email;
     const randomPassword = crypto.randomBytes(24).toString('hex');
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
@@ -175,20 +216,25 @@ export class AuthService {
 
     return {
       success: true,
-      message: 'Votre demande a été envoyée. Un administrateur doit valider votre compte.',
+      message:
+        'Votre demande a été envoyée. Un administrateur doit valider votre compte.',
     };
   }
 
   async refreshTokens(refreshToken: string) {
     try {
-      const payload = await this.jwtService.verifyAsync<{ sub: number; email: string; role: string; orgId: number }>(
-        refreshToken,
-        {
-          secret: process.env.JWT_REFRESH_SECRET,
-        },
-      );
+      const payload = await this.jwtService.verifyAsync<{
+        sub: number;
+        email: string;
+        role: string;
+        orgId: number;
+      }>(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
 
-      const user = await this.prisma.employee.findUnique({ where: { id: payload.sub } });
+      const user = await this.prisma.employee.findUnique({
+        where: { id: payload.sub },
+      });
       if (!user || !user.refreshTokenHash) {
         throw new UnauthorizedException('Token invalide');
       }
@@ -198,7 +244,12 @@ export class AuthService {
         throw new UnauthorizedException('Token invalide');
       }
 
-      const tokens = await this.issueTokens(user.id, user.email, user.role, user.organizationId);
+      const tokens = await this.issueTokens(
+        user.id,
+        user.email,
+        user.role,
+        user.organizationId,
+      );
       await this.storeRefreshTokenHash(user.id, tokens.refreshToken);
 
       return {
@@ -227,10 +278,16 @@ export class AuthService {
     return { success: true };
   }
 
-  private async issueTokens(id: number, email: string, role: string, orgId: number) {
+  private async issueTokens(
+    id: number,
+    email: string,
+    role: string,
+    orgId: number,
+  ) {
     const payload = { sub: id, email, role, orgId };
     const accessToken = await this.jwtService.signAsync(payload);
-    const refreshExpiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as JwtSignOptions['expiresIn'];
+    const refreshExpiresIn = (process.env.JWT_REFRESH_EXPIRES_IN ??
+      '7d') as JwtSignOptions['expiresIn'];
     const refreshToken = await this.jwtService.signAsync(payload, {
       secret: process.env.JWT_REFRESH_SECRET,
       expiresIn: refreshExpiresIn,

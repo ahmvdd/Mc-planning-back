@@ -103,6 +103,7 @@ export class EmployeesService {
       throw new ForbiddenException('Organisation manquante');
     }
 
+    dto.email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.employee.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new BadRequestException('Un compte avec cet email existe déjà.');
@@ -207,6 +208,7 @@ export class EmployeesService {
     if (!orgId) {
       throw new ForbiddenException('Organisation manquante');
     }
+    email = email.trim().toLowerCase();
     const passwordHash = await bcrypt.hash(newPassword, 10);
     try {
       const employee = await this.prisma.employee.findFirst({

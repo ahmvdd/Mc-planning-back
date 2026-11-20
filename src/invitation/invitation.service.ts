@@ -31,6 +31,7 @@ export class InvitationService {
   }
 
   async sendInvitation(email: string, orgId: number) {
+    email = email.trim().toLowerCase();
     // Vérifie si un compte existe déjà
     const existing = await this.prisma.employee.findUnique({ where: { email } });
     if (existing) throw new BadRequestException('Un compte existe déjà pour cet email');

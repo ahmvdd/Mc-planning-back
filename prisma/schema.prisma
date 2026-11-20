@@ -9,23 +9,25 @@ datasource db {
 }
 
 model Employee {
-  id       Int             @id @default(autoincrement())
-  name     String
-  email    String          @unique
-  role     String
-  status   String
-  password String
-  refreshTokenHash String?
-  organizationId Int
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  ownedOrganization Organization? @relation("OrganizationOwner")
-  planning PlanningEntry[]
-  requests Request[]
-  requestLogs RequestLog[] @relation("RequestLogAuthor")
-  pointages Pointage[]
-  availabilities Availability[]
-  templateEntries PlanningTemplateEntry[]
-  notifications Notification[]
+  id                Int                     @id @default(autoincrement())
+  name              String
+  email             String                  @unique
+  role              String
+  status            String
+  password          String
+  refreshTokenHash  String?
+  organizationId    Int
+  organization      Organization            @relation(fields: [organizationId], references: [id])
+  ownedOrganization Organization?           @relation("OrganizationOwner")
+  planning          PlanningEntry[]
+  requests          Request[]
+  requestLogs       RequestLog[]            @relation("RequestLogAuthor")
+  pointages         Pointage[]
+  availabilities    Availability[]
+  templateEntries   PlanningTemplateEntry[]
+  notifications     Notification[]
+
+  @@index([organizationId])
 }
 
 model Availability {
@@ -34,36 +36,38 @@ model Availability {
   employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id])
-  dayOfWeek      Int          // 0 = lundi ... 6 = dimanche
-  startTime      String       // "09:00"
-  endTime        String       // "17:00"
+  dayOfWeek      Int // 0 = lundi ... 6 = dimanche
+  startTime      String // "09:00"
+  endTime        String // "17:00"
   createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 model Organization {
-  id        Int       @id @default(autoincrement())
-  name      String
-  code      String    @unique
-  ownerId   Int?     @unique
-  owner     Employee? @relation("OrganizationOwner", fields: [ownerId], references: [id])
+  id                Int                @id @default(autoincrement())
+  name              String
+  code              String             @unique
+  ownerId           Int?               @unique
+  owner             Employee?          @relation("OrganizationOwner", fields: [ownerId], references: [id])
   planningImageUrl  String?
   planningImageUrl2 String?
-  employees    Employee[]
-  plannings    Planning[]
-  planning     PlanningEntry[]
-  requests     Request[]
-  invitations  Invitation[]
-  pointages    Pointage[]
-  availabilities Availability[]
+  employees         Employee[]
+  plannings         Planning[]
+  planning          PlanningEntry[]
+  requests          Request[]
+  invitations       Invitation[]
+  pointages         Pointage[]
+  availabilities    Availability[]
   planningTemplates PlanningTemplate[]
-  notifications Notification[]
-  createdAt    DateTime  @default(now())
+  notifications     Notification[]
+  createdAt         DateTime           @default(now())
 
   plan                 String    @default("free")
-  subscriptionStatus    String?
-  stripeCustomerId      String?   @unique
-  stripeSubscriptionId  String?   @unique
-  currentPeriodEnd      DateTime?
+  subscriptionStatus   String?
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  currentPeriodEnd     DateTime?
 }
 
 model Planning {
@@ -75,20 +79,25 @@ model Planning {
   organization   Organization    @relation(fields: [organizationId], references: [id])
   entries        PlanningEntry[]
   createdAt      DateTime        @default(now())
+
+  @@index([organizationId])
 }
 
 model PlanningEntry {
-  id         Int      @id @default(autoincrement())
-  date       DateTime
-  shift      String
-  note       String?
-  employeeId Int?
-  employee   Employee? @relation(fields: [employeeId], references: [id])
+  id             Int          @id @default(autoincrement())
+  date           DateTime
+  shift          String
+  note           String?
+  employeeId     Int?
+  employee       Employee?    @relation(fields: [employeeId], references: [id])
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id])
-  planningId Int?
-  planning   Planning? @relation(fields: [planningId], references: [id], onDelete: Cascade)
-  pointages  Pointage[]
+  planningId     Int?
+  planning       Planning?    @relation(fields: [planningId], references: [id], onDelete: Cascade)
+  pointages      Pointage[]
+
+  @@index([organizationId])
+  @@index([organizationId, date])
 }
 
 model PlanningTemplate {
@@ -98,13 +107,15 @@ model PlanningTemplate {
   organization   Organization            @relation(fields: [organizationId], references: [id])
   entries        PlanningTemplateEntry[]
   createdAt      DateTime                @default(now())
+
+  @@index([organizationId])
 }
 
 model PlanningTemplateEntry {
   id         Int              @id @default(autoincrement())
   templateId Int
   template   PlanningTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  dayOfWeek  Int              // 0 = lundi ... 6 = dimanche
+  dayOfWeek  Int // 0 = lundi ... 6 = dimanche
   shift      String
   note       String?
   employeeId Int?
@@ -112,42 +123,48 @@ model PlanningTemplateEntry {
 }
 
 model Invitation {
-  id             Int       @id @default(autoincrement())
+  id             Int          @id @default(autoincrement())
   email          String
-  token          String    @unique
+  token          String       @unique
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id])
   expiresAt      DateTime
   usedAt         DateTime?
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
 }
 
 model Request {
-  id          Int      @id @default(autoincrement())
-  employeeId  Int
-  employee    Employee @relation(fields: [employeeId], references: [id])
-  type        String
-  status      String
-  message     String?
-  adminMessage String?
-  documentUrl String?
+  id             Int          @id @default(autoincrement())
+  employeeId     Int
+  employee       Employee     @relation(fields: [employeeId], references: [id])
+  type           String
+  status         String
+  message        String?
+  adminMessage   String?
+  documentUrl    String?
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id])
-  createdAt   DateTime @default(now())
-  logs        RequestLog[]
+  createdAt      DateTime     @default(now())
+  logs           RequestLog[]
+
+  @@index([organizationId])
 }
 
 model Pointage {
-  id              Int           @id @default(autoincrement())
+  id              Int            @id @default(autoincrement())
   employeeId      Int
-  employee        Employee      @relation(fields: [employeeId], references: [id])
+  employee        Employee       @relation(fields: [employeeId], references: [id])
   planningEntryId Int?
   planningEntry   PlanningEntry? @relation(fields: [planningEntryId], references: [id])
   organizationId  Int
-  organization    Organization  @relation(fields: [organizationId], references: [id])
-  scannedAt       DateTime      @default(now())
-  status          String        // present | late | absent | manual
+  organization    Organization   @relation(fields: [organizationId], references: [id])
+  scannedAt       DateTime       @default(now())
+  status          String // present | late | absent | manual
   note            String?
+
+  @@index([organizationId])
 }
 
 model Notification {
